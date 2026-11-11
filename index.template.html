@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; worker-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src https://fonts.gstatic.com; img-src data: blob: https://server.arcgisonline.com https://cdnjs.cloudflare.com; connect-src https://router.project-osrm.org https://cdnjs.cloudflare.com; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Rally Route Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
+<style>
+:root {
+  --bg: #efebe3; --panel: #fbf9f5; --panel-2: #f3efe7; --ink: #1c1915; --muted: #6d665b; --faint: #9b9387;
+  --line: #e2dbcf; --accent: #e0531f; --accent-2: #ff8a50; --accent-ink: #fff; --accent-soft: #fbe3d6;
+  --ok: #2c7a57; --warn: #a86a12; --err: #b83227; --info: #3a6a96;
+  --shadow: 0 1px 2px rgba(40,30,20,.06), 0 6px 24px rgba(40,30,20,.07);
+  --radius: 14px; --mono: 'JetBrains Mono', ui-monospace, monospace; --sans: 'Manrope', system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0f11; --panel: #16171a; --panel-2: #1d1f23; --ink: #ece7df; --muted: #a39d93; --faint: #6f6a62;
+    --line: #2a2c31; --accent: #ff6a2b; --accent-2: #ff9b66; --accent-ink: #160b05; --accent-soft: #3a1d10;
+    --ok: #4fbf8a; --warn: #e3a440; --err: #ff6b5e; --info: #7fb2e5; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 30px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0f11; --panel: #16171a; --panel-2: #1d1f23; --ink: #ece7df; --muted: #a39d93; --faint: #6f6a62;
+  --line: #2a2c31; --accent: #ff6a2b; --accent-2: #ff9b66; --accent-ink: #160b05; --accent-soft: #3a1d10;
+  --ok: #4fbf8a; --warn: #e3a440; --err: #ff6b5e; --info: #7fb2e5; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 30px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; -webkit-font-smoothing: antialiased; }
+button, input, select { font: inherit; color: inherit; }
+.app { display: grid; grid-template-columns: 440px 1fr; height: 100vh; }
+.panel { overflow-y: auto; padding: 18px 18px 40px; border-right: 1px solid var(--line); background: var(--bg); }
+.mapwrap { position: relative; }
+#map { position: absolute; inset: 0; background: var(--panel-2); }
+
+/* brand */
+.brand { display: flex; align-items: center; gap: 12px; margin: 2px 2px 16px; }
+.brand svg { flex: none; }
+.brand h1 { font-size: 19px; font-weight: 800; letter-spacing: -.02em; margin: 0; line-height: 1.1; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+.brand .sp { flex: 1; }
+.iconbtn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; width: 34px; height: 34px; display: grid; place-items: center; cursor: pointer; color: var(--muted); }
+.iconbtn:hover { color: var(--ink); }
+
+/* cards */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0 0 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.card h2 .n { width: 20px; height: 20px; border-radius: 6px; background: var(--ink); color: var(--panel); display: grid; place-items: center; font-size: 11px; letter-spacing: 0; }
+.card h2 .right { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 600; }
+
+/* dropzone */
+.drop { display: block; border: 1.5px dashed var(--line); border-radius: 12px; padding: 18px; text-align: center; cursor: pointer; transition: .15s; background: var(--panel-2); }
+.drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop strong { display: block; font-size: 14px; margin-bottom: 3px; }
+.drop span { color: var(--muted); font-size: 12.5px; }
+.files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12px; max-width: 100%; }
+.chip b { font-family: var(--mono); font-size: 10.5px; color: var(--accent); }
+.chip i { font-style: normal; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.chip .x { cursor: pointer; color: var(--faint); border: 0; background: none; padding: 0; }
+.stats { display: grid; grid-template-columns: 1fr 1fr 1.15fr 1.35fr; gap: 6px; margin-top: 12px; }
+.stat { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; }
+.stat .v { font-family: var(--mono); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.stat .k { color: var(--muted); font-size: 11px; }
+
+/* form */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+.field .in { display: flex; align-items: center; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; height: 38px; }
+.field .in:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field input, .field select { border: 0; background: transparent; outline: none; width: 100%; height: 100%; font-family: var(--mono); font-size: 13.5px; }
+.field select { font-family: var(--sans); }
+.field .u { color: var(--faint); font-size: 12px; margin-left: 6px; white-space: nowrap; }
+.full { grid-column: 1 / -1; }
+.speed { padding: 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.speed .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.speed .top label { font-weight: 600; font-size: 12px; color: var(--muted); }
+.speed .top output { font-family: var(--mono); font-weight: 600; font-size: 15px; }
+.speed .hint { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.45; }
+.speed .hint .over { color: var(--err); font-weight: 700; }
+.mphin { display: inline-flex; align-items: baseline; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px 9px; }
+.mphin:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.mphin input { width: 44px; border: 0; background: transparent; outline: none; font-family: var(--mono); font-weight: 600; font-size: 16px; text-align: right; }
+.mphin span { color: var(--faint); font-size: 12px; }
+.pill.err { background: color-mix(in srgb, var(--err) 15%, transparent); color: var(--err); }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--accent) var(--p, 50%), var(--line) var(--p, 50%)); outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--panel); border: 3px solid var(--accent); cursor: pointer; }
+input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--panel); border: 3px solid var(--accent); cursor: pointer; }
+.seg { display: flex; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; }
+.seg button { flex: 1; border: 0; background: transparent; padding: 7px 6px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12.5px; color: var(--muted); }
+.seg button.on { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
+.linkbtn { border: 0; background: none; color: var(--accent); cursor: pointer; font-weight: 600; font-size: 12px; padding: 0; }
+details.adv { margin-top: 12px; }
+details.adv summary { cursor: pointer; color: var(--muted); font-size: 12.5px; font-weight: 600; }
+details.adv .grid { margin-top: 10px; }
+
+/* run */
+.go { width: 100%; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 15px; height: 50px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent); transition: transform .1s; }
+.go:hover { transform: translateY(-1px); }
+.go:disabled { opacity: .55; cursor: default; transform: none; }
+.prog { margin: 10px 2px 14px; display: none; }
+.prog.on { display: block; }
+.prog .bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.prog .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .3s; }
+.prog .lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.prog .lbl b { font-family: var(--mono); color: var(--ink); }
+
+/* results */
+.tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.tab { flex: 1; border: 1px solid var(--line); background: var(--panel-2); border-radius: 10px; padding: 8px; cursor: pointer; text-align: left; }
+.tab .t { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.tab .p { font-family: var(--mono); font-weight: 600; font-size: 15px; }
+.tab.on { border-color: var(--accent); background: var(--accent-soft); }
+.tab:disabled { opacity: .5; cursor: default; }
+.hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 4px 2px 14px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.hero .big { font-family: var(--mono); font-size: 40px; font-weight: 600; letter-spacing: -.03em; line-height: 1; }
+.hero .cap { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.hero .fin { text-align: right; }
+.hero .fin .v { font-family: var(--mono); font-weight: 600; font-size: 18px; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 700; }
+.pill.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+.pill.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+.kpi { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; }
+.kpi .v { font-family: var(--mono); font-weight: 600; font-size: 14px; }
+.kpi .k { color: var(--muted); font-size: 11px; }
+.combos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.combo { font-size: 12px; padding: 4px 9px; border-radius: 8px; background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); font-weight: 700; }
+.actions { display: flex; gap: 6px; margin: 4px 0 14px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--panel-2); border-radius: 9px; padding: 7px 11px; cursor: pointer; font-weight: 600; font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; }
+.btn:hover { border-color: var(--accent); }
+.tl { position: relative; }
+.stop { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; padding: 9px 0; position: relative; cursor: pointer; }
+.stop:hover .nm { color: var(--accent); }
+.stop .dot { width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--panel); display: grid; place-items: center; font-family: var(--mono); font-size: 11px; font-weight: 600; z-index: 1; }
+.stop.hq .dot { background: var(--accent); color: var(--accent-ink); }
+.stop .nm { font-weight: 700; transition: color .1s; }
+.stop .nm code { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-right: 6px; }
+.stop .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.stop .proof { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.4; }
+.stop .r { text-align: right; }
+.stop .r .tm { font-family: var(--mono); font-weight: 600; }
+.stop .r .pt { font-family: var(--mono); font-size: 12px; color: var(--ok); }
+.leg { display: grid; grid-template-columns: 30px 1fr; gap: 10px; color: var(--faint); font-size: 11.5px; font-family: var(--mono); }
+.leg .rail { display: flex; justify-content: center; }
+.leg .rail i { width: 2px; min-height: 22px; background: var(--line); border-radius: 2px; }
+.leg span { align-self: center; }
+.leg .fuel { color: var(--warn); font-weight: 600; }
+.tag { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 6px; margin-left: 4px; vertical-align: 1px; }
+.tag.win { background: color-mix(in srgb, var(--info) 16%, transparent); color: var(--info); }
+.tag.wait { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.tag.bike { background: var(--panel-2); color: var(--muted); }
+
+/* bonus list */
+.search { display: flex; gap: 6px; margin-bottom: 8px; }
+.search .in { flex: 1; }
+.blist { max-height: 340px; overflow-y: auto; border-top: 1px solid var(--line); }
+.brow { display: grid; grid-template-columns: 12px 52px 1fr auto auto; gap: 8px; align-items: center; padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: 12.5px; cursor: pointer; }
+.brow .sw { width: 10px; height: 10px; border-radius: 50%; }
+.brow code { font-family: var(--mono); font-weight: 600; font-size: 12px; }
+.brow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.brow .pt { font-family: var(--mono); font-weight: 600; }
+.brow.inr code { color: var(--accent); }
+.tg { display: flex; gap: 3px; }
+.tg button { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; font-size: 10.5px; font-weight: 700; padding: 2px 5px; cursor: pointer; color: var(--faint); }
+.tg button.must.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+.tg button.skip.on { background: var(--err); border-color: var(--err); color: #fff; }
+.issues { list-style: none; margin: 0; padding: 0; }
+.issues li { display: grid; grid-template-columns: 16px 1fr; gap: 8px; padding: 6px 0; font-size: 12.5px; border-bottom: 1px solid var(--line); line-height: 1.45; }
+.issues li:last-child { border-bottom: 0; }
+.issues .ic { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; }
+.ic.error { background: var(--err); } .ic.warn { background: var(--warn); } .ic.info { background: var(--info); }
+.empty { color: var(--muted); font-size: 13px; text-align: center; padding: 10px 0; }
+.foot { color: var(--faint); font-size: 11.5px; line-height: 1.5; padding: 4px 4px 0; }
+
+/* map overlays */
+.legend { position: absolute; left: 14px; bottom: 14px; z-index: 500; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 11.5px; }
+.legend .row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.legend .sw { width: 10px; height: 10px; border-radius: 50%; }
+.legend b { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.maptip { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 600; background: var(--ink); color: var(--panel); padding: 9px 14px; border-radius: 10px; font-weight: 600; font-size: 13px; display: none; box-shadow: var(--shadow); }
+.maptip.on { display: block; }
+.welcome { position: absolute; inset: 0; z-index: 450; display: grid; place-items: center; pointer-events: none; }
+.welcome div { background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); border-radius: 16px; padding: 22px 26px; max-width: 360px; text-align: center; box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+.welcome h3 { margin: 0 0 6px; font-size: 17px; }
+.welcome p { margin: 0; color: var(--muted); line-height: 1.5; }
+.toast { position: fixed; right: 16px; bottom: 16px; z-index: 1000; background: var(--ink); color: var(--panel); padding: 10px 14px; border-radius: 10px; font-weight: 600; font-size: 13px; opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; max-width: 360px; }
+.toast.on { opacity: 1; transform: none; }
+
+.pin { width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--panel); border: 2px solid var(--panel); display: grid; place-items: center; font-family: var(--mono); font-size: 10.5px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.pin.hq { background: var(--accent); color: var(--accent-ink); width: 30px; height: 30px; font-size: 13px; }
+.leaflet-popup-content-wrapper { background: var(--panel); color: var(--ink); border-radius: 12px; box-shadow: var(--shadow); }
+.leaflet-popup-tip { background: var(--panel); }
+.leaflet-popup-content { margin: 12px 14px; font-family: var(--sans); font-size: 13px; line-height: 1.45; }
+.pop h4 { margin: 0 0 2px; font-size: 14px; }
+.pop h4 code { font-family: var(--mono); color: var(--accent); margin-right: 6px; }
+.pop .m { color: var(--muted); font-size: 12px; }
+.pop .pr { margin-top: 6px; }
+.pop .nt { margin-top: 6px; font-size: 12px; color: var(--warn); }
+.pop .b { display: flex; gap: 6px; margin-top: 10px; }
+.leaflet-tooltip { background: var(--panel); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); font-family: var(--mono); font-size: 11.5px; }
+.leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 80%, transparent) !important; color: var(--muted) !important; }
+.leaflet-control-attribution a { color: var(--muted) !important; }
+.leaflet-bar a { background: var(--panel) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; height: auto; }
+  .mapwrap { height: 56vh; position: sticky; top: 0; z-index: 2; order: -1; }
+  .panel { border-right: 0; padding: 14px 16px 40px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .legend { display: none; }
+}
+@media print {
+  .mapwrap, .go, .prog, #filesCard, #bikeCard, #clockCard, #bonusCard, .actions, .tabs, .brand .iconbtn { display: none !important; }
+  .app { display: block; height: auto; }
+  .panel { overflow: visible; border: 0; }
+  .card { box-shadow: none; break-inside: avoid-page; }
+  .stop { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <div class="brand">
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
+        <rect width="40" height="40" rx="11" fill="var(--ink)"/>
+        <path d="M9 30c4 0 4-7 9-7s4 6 8 6 5-14 5-18" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="9" cy="30" r="3" fill="var(--panel)"/><circle cx="31" cy="11" r="3.2" fill="var(--accent)" stroke="var(--panel)" stroke-width="1.5"/>
+      </svg>
+      <div><h1>Rally Route Planner</h1><p>Drop in the rally files. Get the best route.</p></div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="theme" title="Toggle light / dark">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+
+    <section class="card" id="filesCard">
+      <h2><span class="n">1</span>Rally files</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="fileIn" multiple accept=".pdf,.csv,.gpx,.txt,.tsv" hidden>
+        <strong>Drop rally book, bonus CSV and GPX here</strong>
+        <span>or click to browse · PDF, CSV and GPX, any combination</span>
+      </label>
+      <div class="files" id="fileChips"></div>
+      <div class="stats" id="stats" hidden></div>
+    </section>
+
+    <section class="card" id="bikeCard">
+      <h2><span class="n">2</span>Rider &amp; bike</h2>
+      <div class="grid">
+        <div class="field"><label for="range">Fuel range</label><div class="in"><input id="range" data-key="range" type="number" min="40" step="5"><span class="u">mi</span></div></div>
+        <div class="field"><label for="mpg">Fuel economy</label><div class="in"><input id="mpg" data-key="mpg" type="number" min="5" step="1"><span class="u">mpg</span></div></div>
+        <div class="field"><label for="reserve">Fuel reserve</label><div class="in"><input id="reserve" data-key="reserve" type="number" min="0" max="50" step="5"><span class="u">%</span></div></div>
+        <div class="field"><label for="stopMin">Time per bonus</label><div class="in"><input id="stopMin" data-key="stopMin" type="number" min="1" max="60" step="1"><span class="u">min</span></div></div>
+        <div class="speed full">
+          <div class="top"><label for="mph">Average moving speed</label>
+            <span class="mphin"><input id="mph" data-key="mph" type="number" min="20" max="100" step="1"><span>mph</span></span></div>
+          <input type="range" id="mphRange" data-key="mph" min="30" max="100" step="1" aria-label="Average moving speed slider">
+          <div class="hint" id="paceHint"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="clockCard">
+      <h2><span class="n">3</span>Rally clock &amp; start</h2>
+      <div class="grid">
+        <div class="field"><label for="start">Start</label><div class="in"><input id="start" data-key="start" type="time"></div></div>
+        <div class="field"><label for="end">Must finish by</label><div class="in"><input id="end" data-key="end" type="time"></div></div>
+        <div class="field"><label for="buffer">Safety buffer</label><div class="in"><input id="buffer" data-key="buffer" type="number" min="0" step="5"><span class="u">min early</span></div></div>
+        <div class="field"><label for="fuelMin">Fuel stop</label><div class="in"><input id="fuelMin" data-key="fuelMin" type="number" min="1" step="1"><span class="u">min</span></div></div>
+        <div class="field full"><label for="startPt">Start point <button class="linkbtn" data-pick="start" type="button">Set on map</button></label><div class="in"><select id="startPt"></select></div></div>
+        <div class="field full"><label for="finishPt">Finish point <button class="linkbtn" data-pick="finish" type="button">Set on map</button></label><div class="in"><select id="finishPt"></select></div></div>
+        <div class="field full"><label>Search depth</label><div class="seg" id="depth"><button data-v="quick" type="button">Quick · 8 s</button><button data-v="standard" type="button">Standard · 20 s</button><button data-v="deep" type="button">Deep · 60 s</button></div></div>
+      </div>
+      <details class="adv">
+        <summary>Advanced</summary>
+        <div class="grid">
+          <div class="field"><label for="winMargin">Window margin</label><div class="in"><input id="winMargin" data-key="winMargin" type="number" min="0" step="1"><span class="u">min before close</span></div></div>
+          <div class="field"><label for="fuelPrice">Fuel price</label><div class="in"><input id="fuelPrice" data-key="fuelPrice" type="number" min="0" step="0.05"><span class="u">$/gal</span></div></div>
+          <div class="field"><label for="sunrise">Sunrise</label><div class="in"><input id="sunrise" data-key="sunrise" type="time"></div></div>
+          <div class="field"><label for="sunset">Sunset</label><div class="in"><input id="sunset" data-key="sunset" type="time"></div></div>
+          <div class="field"><label for="calib">Router calibration</label><div class="in"><input id="calib" data-key="calib" type="number" min="0.5" max="1.2" step="0.01"><span class="u">× router time</span></div></div>
+          <div class="field"><label for="autoExtra">Extra time for walks, gates, gravel</label><div class="in"><select id="autoExtra" data-key="autoExtra"><option value="true">Add automatically</option><option value="false">Off</option></select></div></div>
+        </div>
+      </details>
+    </section>
+
+    <button class="go" id="go" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 19c3 0 3-6 7-6s4 4 7 4"/><circle cx="5" cy="19" r="1.6" fill="currentColor"/><path d="M19 5v6M16 8h6"/></svg>
+      <span id="goLbl">Load rally files to begin</span>
+    </button>
+    <div class="prog" id="prog"><div class="bar"><i></i></div><div class="lbl"><span id="progTxt">Working…</span><b id="progPts"></b></div></div>
+
+    <section class="card" id="resCard" hidden>
+      <h2>Route</h2>
+      <div class="tabs" id="tabs"></div>
+      <div id="resBody"></div>
+    </section>
+
+    <section class="card" id="bonusCard" hidden>
+      <h2>Bonuses<span class="right" id="bonusCount"></span></h2>
+      <div class="search"><div class="field in-wrap" style="flex:1"><div class="in"><input id="q" placeholder="Search code, name or town" autocomplete="off"></div></div></div>
+      <div class="blist" id="blist"></div>
+      <p class="foot">Must = always include. Skip = never route there. Changes apply on the next search.</p>
+    </section>
+
+    <section class="card" id="issueCard" hidden>
+      <h2>Checks &amp; assumptions</h2>
+      <ul class="issues" id="issues"></ul>
+    </section>
+
+    <p class="foot">Road distances and times from the free OSRM routing service (OpenStreetMap data). Router times run about 20% under posted limits, so they are multiplied by the calibration (default 0.80) to get posted-limit time. Your average speed then scales every leg, keeping interstates faster than towns. Speeds above the posted-limit average are flagged in red. Map tiles © Esri, data © OpenStreetMap contributors.</p>
+  </aside>
+
+  <main class="mapwrap">
+    <div id="map"></div>
+    <div class="maptip" id="maptip">Click the map to set the point · Esc to cancel</div>
+    <div class="welcome" id="welcome"><div><h3>Your rally, mapped</h3><p>Drop the rally book PDF, the bonus CSV and the GPX on the left. Every bonus appears here, sized and colored by points.</p></div></div>
+    <div class="legend" id="legend" hidden></div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script id="engine-src">
+/*__ENGINE__*/
+</script>
+<script>
+/*__APP__*/
+</script>
+</body>
+</html>

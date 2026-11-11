@@ -1,0 +1,1529 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-aSXZTy15F+bjT8DyFkXfyQ+aYk5t6Zh0+R+LJeA7YBU=' 'sha256-/PiaLlIwRDAK7RVzdxsIV8UkvKmOgPO4ahDRR0GTqm0=' https://cdnjs.cloudflare.com; worker-src blob:; style-src 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src https://fonts.gstatic.com; img-src data: blob: https://server.arcgisonline.com https://cdnjs.cloudflare.com; connect-src https://router.project-osrm.org https://cdnjs.cloudflare.com; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Rally Route Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
+<style>
+:root {
+  --bg: #efebe3; --panel: #fbf9f5; --panel-2: #f3efe7; --ink: #1c1915; --muted: #6d665b; --faint: #9b9387;
+  --line: #e2dbcf; --accent: #e0531f; --accent-2: #ff8a50; --accent-ink: #fff; --accent-soft: #fbe3d6;
+  --ok: #2c7a57; --warn: #a86a12; --err: #b83227; --info: #3a6a96;
+  --shadow: 0 1px 2px rgba(40,30,20,.06), 0 6px 24px rgba(40,30,20,.07);
+  --radius: 14px; --mono: 'JetBrains Mono', ui-monospace, monospace; --sans: 'Manrope', system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0f11; --panel: #16171a; --panel-2: #1d1f23; --ink: #ece7df; --muted: #a39d93; --faint: #6f6a62;
+    --line: #2a2c31; --accent: #ff6a2b; --accent-2: #ff9b66; --accent-ink: #160b05; --accent-soft: #3a1d10;
+    --ok: #4fbf8a; --warn: #e3a440; --err: #ff6b5e; --info: #7fb2e5; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 30px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0f11; --panel: #16171a; --panel-2: #1d1f23; --ink: #ece7df; --muted: #a39d93; --faint: #6f6a62;
+  --line: #2a2c31; --accent: #ff6a2b; --accent-2: #ff9b66; --accent-ink: #160b05; --accent-soft: #3a1d10;
+  --ok: #4fbf8a; --warn: #e3a440; --err: #ff6b5e; --info: #7fb2e5; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 30px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; -webkit-font-smoothing: antialiased; }
+button, input, select { font: inherit; color: inherit; }
+.app { display: grid; grid-template-columns: 440px 1fr; height: 100vh; }
+.panel { overflow-y: auto; padding: 18px 18px 40px; border-right: 1px solid var(--line); background: var(--bg); }
+.mapwrap { position: relative; }
+#map { position: absolute; inset: 0; background: var(--panel-2); }
+
+/* brand */
+.brand { display: flex; align-items: center; gap: 12px; margin: 2px 2px 16px; }
+.brand svg { flex: none; }
+.brand h1 { font-size: 19px; font-weight: 800; letter-spacing: -.02em; margin: 0; line-height: 1.1; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+.brand .sp { flex: 1; }
+.iconbtn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; width: 34px; height: 34px; display: grid; place-items: center; cursor: pointer; color: var(--muted); }
+.iconbtn:hover { color: var(--ink); }
+
+/* cards */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0 0 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.card h2 .n { width: 20px; height: 20px; border-radius: 6px; background: var(--ink); color: var(--panel); display: grid; place-items: center; font-size: 11px; letter-spacing: 0; }
+.card h2 .right { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 600; }
+
+/* dropzone */
+.drop { display: block; border: 1.5px dashed var(--line); border-radius: 12px; padding: 18px; text-align: center; cursor: pointer; transition: .15s; background: var(--panel-2); }
+.drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop strong { display: block; font-size: 14px; margin-bottom: 3px; }
+.drop span { color: var(--muted); font-size: 12.5px; }
+.files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12px; max-width: 100%; }
+.chip b { font-family: var(--mono); font-size: 10.5px; color: var(--accent); }
+.chip i { font-style: normal; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.chip .x { cursor: pointer; color: var(--faint); border: 0; background: none; padding: 0; }
+.stats { display: grid; grid-template-columns: 1fr 1fr 1.15fr 1.35fr; gap: 6px; margin-top: 12px; }
+.stat { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; }
+.stat .v { font-family: var(--mono); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.stat .k { color: var(--muted); font-size: 11px; }
+
+/* form */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+.field .in { display: flex; align-items: center; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; height: 38px; }
+.field .in:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field input, .field select { border: 0; background: transparent; outline: none; width: 100%; height: 100%; font-family: var(--mono); font-size: 13.5px; }
+.field select { font-family: var(--sans); }
+.field .u { color: var(--faint); font-size: 12px; margin-left: 6px; white-space: nowrap; }
+.full { grid-column: 1 / -1; }
+.speed { padding: 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.speed .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.speed .top label { font-weight: 600; font-size: 12px; color: var(--muted); }
+.speed .top output { font-family: var(--mono); font-weight: 600; font-size: 15px; }
+.speed .hint { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.45; }
+.speed .hint .over { color: var(--err); font-weight: 700; }
+.mphin { display: inline-flex; align-items: baseline; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px 9px; }
+.mphin:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.mphin input { width: 44px; border: 0; background: transparent; outline: none; font-family: var(--mono); font-weight: 600; font-size: 16px; text-align: right; }
+.mphin span { color: var(--faint); font-size: 12px; }
+.pill.err { background: color-mix(in srgb, var(--err) 15%, transparent); color: var(--err); }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--accent) var(--p, 50%), var(--line) var(--p, 50%)); outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--panel); border: 3px solid var(--accent); cursor: pointer; }
+input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--panel); border: 3px solid var(--accent); cursor: pointer; }
+.seg { display: flex; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; }
+.seg button { flex: 1; border: 0; background: transparent; padding: 7px 6px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12.5px; color: var(--muted); }
+.seg button.on { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
+.linkbtn { border: 0; background: none; color: var(--accent); cursor: pointer; font-weight: 600; font-size: 12px; padding: 0; }
+details.adv { margin-top: 12px; }
+details.adv summary { cursor: pointer; color: var(--muted); font-size: 12.5px; font-weight: 600; }
+details.adv .grid { margin-top: 10px; }
+
+/* run */
+.go { width: 100%; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 15px; height: 50px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent); transition: transform .1s; }
+.go:hover { transform: translateY(-1px); }
+.go:disabled { opacity: .55; cursor: default; transform: none; }
+.prog { margin: 10px 2px 14px; display: none; }
+.prog.on { display: block; }
+.prog .bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.prog .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .3s; }
+.prog .lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.prog .lbl b { font-family: var(--mono); color: var(--ink); }
+
+/* results */
+.tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.tab { flex: 1; border: 1px solid var(--line); background: var(--panel-2); border-radius: 10px; padding: 8px; cursor: pointer; text-align: left; }
+.tab .t { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.tab .p { font-family: var(--mono); font-weight: 600; font-size: 15px; }
+.tab.on { border-color: var(--accent); background: var(--accent-soft); }
+.tab:disabled { opacity: .5; cursor: default; }
+.hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 4px 2px 14px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.hero .big { font-family: var(--mono); font-size: 40px; font-weight: 600; letter-spacing: -.03em; line-height: 1; }
+.hero .cap { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.hero .fin { text-align: right; }
+.hero .fin .v { font-family: var(--mono); font-weight: 600; font-size: 18px; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 700; }
+.pill.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+.pill.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+.kpi { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; }
+.kpi .v { font-family: var(--mono); font-weight: 600; font-size: 14px; }
+.kpi .k { color: var(--muted); font-size: 11px; }
+.combos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.combo { font-size: 12px; padding: 4px 9px; border-radius: 8px; background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); font-weight: 700; }
+.actions { display: flex; gap: 6px; margin: 4px 0 14px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--panel-2); border-radius: 9px; padding: 7px 11px; cursor: pointer; font-weight: 600; font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; }
+.btn:hover { border-color: var(--accent); }
+.tl { position: relative; }
+.stop { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; padding: 9px 0; position: relative; cursor: pointer; }
+.stop:hover .nm { color: var(--accent); }
+.stop .dot { width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--panel); display: grid; place-items: center; font-family: var(--mono); font-size: 11px; font-weight: 600; z-index: 1; }
+.stop.hq .dot { background: var(--accent); color: var(--accent-ink); }
+.stop .nm { font-weight: 700; transition: color .1s; }
+.stop .nm code { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-right: 6px; }
+.stop .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.stop .proof { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.4; }
+.stop .r { text-align: right; }
+.stop .r .tm { font-family: var(--mono); font-weight: 600; }
+.stop .r .pt { font-family: var(--mono); font-size: 12px; color: var(--ok); }
+.leg { display: grid; grid-template-columns: 30px 1fr; gap: 10px; color: var(--faint); font-size: 11.5px; font-family: var(--mono); }
+.leg .rail { display: flex; justify-content: center; }
+.leg .rail i { width: 2px; min-height: 22px; background: var(--line); border-radius: 2px; }
+.leg span { align-self: center; }
+.leg .fuel { color: var(--warn); font-weight: 600; }
+.tag { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 6px; margin-left: 4px; vertical-align: 1px; }
+.tag.win { background: color-mix(in srgb, var(--info) 16%, transparent); color: var(--info); }
+.tag.wait { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.tag.bike { background: var(--panel-2); color: var(--muted); }
+
+/* bonus list */
+.search { display: flex; gap: 6px; margin-bottom: 8px; }
+.search .in { flex: 1; }
+.blist { max-height: 340px; overflow-y: auto; border-top: 1px solid var(--line); }
+.brow { display: grid; grid-template-columns: 12px 52px 1fr auto auto; gap: 8px; align-items: center; padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: 12.5px; cursor: pointer; }
+.brow .sw { width: 10px; height: 10px; border-radius: 50%; }
+.brow code { font-family: var(--mono); font-weight: 600; font-size: 12px; }
+.brow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.brow .pt { font-family: var(--mono); font-weight: 600; }
+.brow.inr code { color: var(--accent); }
+.tg { display: flex; gap: 3px; }
+.tg button { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; font-size: 10.5px; font-weight: 700; padding: 2px 5px; cursor: pointer; color: var(--faint); }
+.tg button.must.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+.tg button.skip.on { background: var(--err); border-color: var(--err); color: #fff; }
+.issues { list-style: none; margin: 0; padding: 0; }
+.issues li { display: grid; grid-template-columns: 16px 1fr; gap: 8px; padding: 6px 0; font-size: 12.5px; border-bottom: 1px solid var(--line); line-height: 1.45; }
+.issues li:last-child { border-bottom: 0; }
+.issues .ic { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; }
+.ic.error { background: var(--err); } .ic.warn { background: var(--warn); } .ic.info { background: var(--info); }
+.empty { color: var(--muted); font-size: 13px; text-align: center; padding: 10px 0; }
+.foot { color: var(--faint); font-size: 11.5px; line-height: 1.5; padding: 4px 4px 0; }
+
+/* map overlays */
+.legend { position: absolute; left: 14px; bottom: 14px; z-index: 500; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 11.5px; }
+.legend .row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.legend .sw { width: 10px; height: 10px; border-radius: 50%; }
+.legend b { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.maptip { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 600; background: var(--ink); color: var(--panel); padding: 9px 14px; border-radius: 10px; font-weight: 600; font-size: 13px; display: none; box-shadow: var(--shadow); }
+.maptip.on { display: block; }
+.welcome { position: absolute; inset: 0; z-index: 450; display: grid; place-items: center; pointer-events: none; }
+.welcome div { background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); border-radius: 16px; padding: 22px 26px; max-width: 360px; text-align: center; box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+.welcome h3 { margin: 0 0 6px; font-size: 17px; }
+.welcome p { margin: 0; color: var(--muted); line-height: 1.5; }
+.toast { position: fixed; right: 16px; bottom: 16px; z-index: 1000; background: var(--ink); color: var(--panel); padding: 10px 14px; border-radius: 10px; font-weight: 600; font-size: 13px; opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; max-width: 360px; }
+.toast.on { opacity: 1; transform: none; }
+
+.pin { width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--panel); border: 2px solid var(--panel); display: grid; place-items: center; font-family: var(--mono); font-size: 10.5px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.pin.hq { background: var(--accent); color: var(--accent-ink); width: 30px; height: 30px; font-size: 13px; }
+.leaflet-popup-content-wrapper { background: var(--panel); color: var(--ink); border-radius: 12px; box-shadow: var(--shadow); }
+.leaflet-popup-tip { background: var(--panel); }
+.leaflet-popup-content { margin: 12px 14px; font-family: var(--sans); font-size: 13px; line-height: 1.45; }
+.pop h4 { margin: 0 0 2px; font-size: 14px; }
+.pop h4 code { font-family: var(--mono); color: var(--accent); margin-right: 6px; }
+.pop .m { color: var(--muted); font-size: 12px; }
+.pop .pr { margin-top: 6px; }
+.pop .nt { margin-top: 6px; font-size: 12px; color: var(--warn); }
+.pop .b { display: flex; gap: 6px; margin-top: 10px; }
+.leaflet-tooltip { background: var(--panel); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); font-family: var(--mono); font-size: 11.5px; }
+.leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 80%, transparent) !important; color: var(--muted) !important; }
+.leaflet-control-attribution a { color: var(--muted) !important; }
+.leaflet-bar a { background: var(--panel) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; height: auto; }
+  .mapwrap { height: 56vh; position: sticky; top: 0; z-index: 2; order: -1; }
+  .panel { border-right: 0; padding: 14px 16px 40px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .legend { display: none; }
+}
+@media print {
+  .mapwrap, .go, .prog, #filesCard, #bikeCard, #clockCard, #bonusCard, .actions, .tabs, .brand .iconbtn { display: none !important; }
+  .app { display: block; height: auto; }
+  .panel { overflow: visible; border: 0; }
+  .card { box-shadow: none; break-inside: avoid-page; }
+  .stop { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <div class="brand">
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
+        <rect width="40" height="40" rx="11" fill="var(--ink)"/>
+        <path d="M9 30c4 0 4-7 9-7s4 6 8 6 5-14 5-18" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="9" cy="30" r="3" fill="var(--panel)"/><circle cx="31" cy="11" r="3.2" fill="var(--accent)" stroke="var(--panel)" stroke-width="1.5"/>
+      </svg>
+      <div><h1>Rally Route Planner</h1><p>Drop in the rally files. Get the best route.</p></div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="theme" title="Toggle light / dark">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+
+    <section class="card" id="filesCard">
+      <h2><span class="n">1</span>Rally files</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="fileIn" multiple accept=".pdf,.csv,.gpx,.txt,.tsv" hidden>
+        <strong>Drop rally book, bonus CSV and GPX here</strong>
+        <span>or click to browse · PDF, CSV and GPX, any combination</span>
+      </label>
+      <div class="files" id="fileChips"></div>
+      <div class="stats" id="stats" hidden></div>
+    </section>
+
+    <section class="card" id="bikeCard">
+      <h2><span class="n">2</span>Rider &amp; bike</h2>
+      <div class="grid">
+        <div class="field"><label for="range">Fuel range</label><div class="in"><input id="range" data-key="range" type="number" min="40" step="5"><span class="u">mi</span></div></div>
+        <div class="field"><label for="mpg">Fuel economy</label><div class="in"><input id="mpg" data-key="mpg" type="number" min="5" step="1"><span class="u">mpg</span></div></div>
+        <div class="field"><label for="reserve">Fuel reserve</label><div class="in"><input id="reserve" data-key="reserve" type="number" min="0" max="50" step="5"><span class="u">%</span></div></div>
+        <div class="field"><label for="stopMin">Time per bonus</label><div class="in"><input id="stopMin" data-key="stopMin" type="number" min="1" max="60" step="1"><span class="u">min</span></div></div>
+        <div class="speed full">
+          <div class="top"><label for="mph">Average moving speed</label>
+            <span class="mphin"><input id="mph" data-key="mph" type="number" min="20" max="100" step="1"><span>mph</span></span></div>
+          <input type="range" id="mphRange" data-key="mph" min="30" max="100" step="1" aria-label="Average moving speed slider">
+          <div class="hint" id="paceHint"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="clockCard">
+      <h2><span class="n">3</span>Rally clock &amp; start</h2>
+      <div class="grid">
+        <div class="field"><label for="start">Start</label><div class="in"><input id="start" data-key="start" type="time"></div></div>
+        <div class="field"><label for="end">Must finish by</label><div class="in"><input id="end" data-key="end" type="time"></div></div>
+        <div class="field"><label for="buffer">Safety buffer</label><div class="in"><input id="buffer" data-key="buffer" type="number" min="0" step="5"><span class="u">min early</span></div></div>
+        <div class="field"><label for="fuelMin">Fuel stop</label><div class="in"><input id="fuelMin" data-key="fuelMin" type="number" min="1" step="1"><span class="u">min</span></div></div>
+        <div class="field full"><label for="startPt">Start point <button class="linkbtn" data-pick="start" type="button">Set on map</button></label><div class="in"><select id="startPt"></select></div></div>
+        <div class="field full"><label for="finishPt">Finish point <button class="linkbtn" data-pick="finish" type="button">Set on map</button></label><div class="in"><select id="finishPt"></select></div></div>
+        <div class="field full"><label>Search depth</label><div class="seg" id="depth"><button data-v="quick" type="button">Quick · 8 s</button><button data-v="standard" type="button">Standard · 20 s</button><button data-v="deep" type="button">Deep · 60 s</button></div></div>
+      </div>
+      <details class="adv">
+        <summary>Advanced</summary>
+        <div class="grid">
+          <div class="field"><label for="winMargin">Window margin</label><div class="in"><input id="winMargin" data-key="winMargin" type="number" min="0" step="1"><span class="u">min before close</span></div></div>
+          <div class="field"><label for="fuelPrice">Fuel price</label><div class="in"><input id="fuelPrice" data-key="fuelPrice" type="number" min="0" step="0.05"><span class="u">$/gal</span></div></div>
+          <div class="field"><label for="sunrise">Sunrise</label><div class="in"><input id="sunrise" data-key="sunrise" type="time"></div></div>
+          <div class="field"><label for="sunset">Sunset</label><div class="in"><input id="sunset" data-key="sunset" type="time"></div></div>
+          <div class="field"><label for="calib">Router calibration</label><div class="in"><input id="calib" data-key="calib" type="number" min="0.5" max="1.2" step="0.01"><span class="u">× router time</span></div></div>
+          <div class="field"><label for="autoExtra">Extra time for walks, gates, gravel</label><div class="in"><select id="autoExtra" data-key="autoExtra"><option value="true">Add automatically</option><option value="false">Off</option></select></div></div>
+        </div>
+      </details>
+    </section>
+
+    <button class="go" id="go" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 19c3 0 3-6 7-6s4 4 7 4"/><circle cx="5" cy="19" r="1.6" fill="currentColor"/><path d="M19 5v6M16 8h6"/></svg>
+      <span id="goLbl">Load rally files to begin</span>
+    </button>
+    <div class="prog" id="prog"><div class="bar"><i></i></div><div class="lbl"><span id="progTxt">Working…</span><b id="progPts"></b></div></div>
+
+    <section class="card" id="resCard" hidden>
+      <h2>Route</h2>
+      <div class="tabs" id="tabs"></div>
+      <div id="resBody"></div>
+    </section>
+
+    <section class="card" id="bonusCard" hidden>
+      <h2>Bonuses<span class="right" id="bonusCount"></span></h2>
+      <div class="search"><div class="field in-wrap" style="flex:1"><div class="in"><input id="q" placeholder="Search code, name or town" autocomplete="off"></div></div></div>
+      <div class="blist" id="blist"></div>
+      <p class="foot">Must = always include. Skip = never route there. Changes apply on the next search.</p>
+    </section>
+
+    <section class="card" id="issueCard" hidden>
+      <h2>Checks &amp; assumptions</h2>
+      <ul class="issues" id="issues"></ul>
+    </section>
+
+    <p class="foot">Road distances and times from the free OSRM routing service (OpenStreetMap data). Router times run about 20% under posted limits, so they are multiplied by the calibration (default 0.80) to get posted-limit time. Your average speed then scales every leg, keeping interstates faster than towns. Speeds above the posted-limit average are flagged in red. Map tiles © Esri, data © OpenStreetMap contributors.</p>
+  </aside>
+
+  <main class="mapwrap">
+    <div id="map"></div>
+    <div class="maptip" id="maptip">Click the map to set the point · Esc to cancel</div>
+    <div class="welcome" id="welcome"><div><h3>Your rally, mapped</h3><p>Drop the rally book PDF, the bonus CSV and the GPX on the left. Every bonus appears here, sized and colored by points.</p></div></div>
+    <div class="legend" id="legend" hidden></div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script id="engine-src">
+/* Rally Route Planner engine: file parsing, data merge and route optimisation.
+   Pure functions, no DOM, so it runs on the page, in a Web Worker, and in Node for tests. */
+(function (root) {
+  'use strict';
+
+  const DAY = 1440;
+
+  // ---------------------------------------------------------------- helpers
+  function num(s) { const v = parseFloat(String(s).replace(/[, ]/g, '')); return isFinite(v) ? v : null; }
+  function isCode(s) { return /^[A-Z0-9]{2,8}$/.test(s) && /[A-Z]/.test(s); }
+  function hav(a, b) {
+    const R = 3958.8, r = Math.PI / 180;
+    const dl = (b.lat - a.lat) * r, dn = (b.lon - a.lon) * r;
+    const x = Math.sin(dl / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dn / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(x));
+  }
+  function fmtTime(m) {
+    m = Math.round(m); const d = Math.floor(m / DAY); m -= d * DAY;
+    const h = Math.floor(m / 60), mm = m % 60;
+    return `${((h + 11) % 12) + 1}:${String(mm).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}${d > 0 ? ` +${d}d` : ''}`;
+  }
+
+  // ---------------------------------------------------------------- coordinates
+  // One coordinate: "N31° 28.880'", "W83 31.563", "31.4813", "-83.52", "N31 28 52.8"
+  function parseCoord(s) {
+    if (s == null) return null;
+    s = String(s).trim();
+    const hemi = (s.match(/[NSEW]/i) || [''])[0].toUpperCase();
+    const parts = s.replace(/[NSEW]/gi, ' ').match(/-?\d+(?:\.\d+)?/g);
+    if (!parts) return null;
+    let v;
+    if (parts.length === 1) v = parseFloat(parts[0]);
+    else if (parts.length === 2) v = Math.abs(parseFloat(parts[0])) + parseFloat(parts[1]) / 60;
+    else v = Math.abs(parseFloat(parts[0])) + parseFloat(parts[1]) / 60 + parseFloat(parts[2]) / 3600;
+    if (parts[0].startsWith('-')) v = -Math.abs(v);
+    if (hemi === 'S' || hemi === 'W') v = -Math.abs(v);
+    return isFinite(v) ? v : null;
+  }
+  // A lat/lon pair inside free text
+  function findCoordPair(text) {
+    let m = text.match(/([NS])\s*(\d{1,3})[^\d\n]{0,3}\s*(\d{1,2}(?:\.\d+)?)['′’]?\s*,?\s*([EW])\s*(\d{1,3})[^\d\n]{0,3}\s*(\d{1,2}(?:\.\d+)?)/i);
+    if (m) {
+      let lat = +m[2] + +m[3] / 60, lon = +m[5] + +m[6] / 60;
+      if (m[1].toUpperCase() === 'S') lat = -lat;
+      if (m[4].toUpperCase() === 'W') lon = -lon;
+      return { lat, lon };
+    }
+    m = text.match(/(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/);
+    if (m) return { lat: +m[1], lon: +m[2] };
+    return null;
+  }
+
+  // ---------------------------------------------------------------- times and windows
+  function parseClock(s) {
+    const m = String(s).trim().match(/^(\d{1,2})(?::?(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|noon|midnight)?$/i);
+    if (!m) return null;
+    let h = +m[1], mm = m[2] ? +m[2] : 0;
+    const ap = (m[3] || '').toLowerCase();
+    if (ap.startsWith('noon')) return 720;
+    if (ap.startsWith('midnight')) return 0;
+    if (h > 23 || mm > 59) return null;
+    if (ap.startsWith('a')) h = h % 12;
+    else if (ap.startsWith('p')) h = (h % 12) + 12;
+    return { min: h * 60 + mm, explicit: !!ap, h, mm };
+  }
+  function to24(c, ref, after) {
+    // c without AM/PM: choose the reading that lands inside the rally day (or after `after`)
+    if (c.explicit) return c.min;
+    const opts = [(c.h % 12) * 60 + c.mm, ((c.h % 12) + 12) * 60 + c.mm];
+    if (after != null) return opts.find(o => o > after) ?? opts[1];
+    const inside = opts.filter(o => o >= ref.start - 60 && o <= ref.end);
+    return inside.length ? inside[0] : (c.h >= 7 && c.h <= 11 ? opts[0] : opts[1]);
+  }
+  // Returns {type:'open'} | {type:'win',open,close} | {type:'daylight'} | {type:'unknown',raw}
+  function parseWindow(raw, rally) {
+    if (raw == null) return { type: 'open' };
+    const s = String(raw).trim();
+    if (!s || /24\s*h|all\s*day|any\s*time|anytime|always|^n\/?a$|^-$/i.test(s)) return { type: 'open' };
+    if (/daylight|sunrise|sunset|dawn|dusk/i.test(s)) return { type: 'daylight', raw: s };
+    const m = s.replace(/[–—]/g, '-').match(/(\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?|noon)?)\s*(?:-|to|until)\s*(\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?|noon|midnight)?)/i);
+    if (!m) return { type: 'unknown', raw: s };
+    const a = parseClock(m[1]), b = parseClock(m[2]);
+    if (!a || !b) return { type: 'unknown', raw: s };
+    // "11:00 - 1:00 PM": the PM applies to the end; start inherits only if that keeps start < end
+    if (!a.explicit && b.explicit) {
+      const same = { ...a, explicit: true, min: (a.h % 12) * 60 + a.mm + (b.min >= 720 ? 720 : 0) };
+      if (same.min < b.min) a.min = same.min, a.explicit = true;
+    }
+    const open = to24(a, rally);
+    const close = b.explicit ? b.min : to24(b, rally, open);
+    return { type: 'win', open, close, assumed: !(a.explicit && b.explicit), raw: s };
+  }
+  function windowText(w) {
+    if (!w || w.type === 'open') return '24 h';
+    if (w.type === 'win') return `${fmtTime(w.open)} - ${fmtTime(w.close)}`;
+    if (w.type === 'daylight') return 'Daylight';
+    return w.raw || '?';
+  }
+
+  // ---------------------------------------------------------------- CSV
+  function splitCSVLine(line, sep) {
+    const out = []; let cur = '', q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (q) { if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === sep) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur); return out.map(s => s.trim());
+  }
+  function parseCSV(text) {
+    const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim());
+    if (!lines.length) return { rows: [], warnings: ['CSV is empty'] };
+    const sep = (lines[0].match(/\t/g) || []).length > (lines[0].match(/,/g) || []).length ? '\t' : (lines[0].includes(';') && !lines[0].includes(',') ? ';' : ',');
+    const head = splitCSVLine(lines[0], sep).map(h => h.toLowerCase());
+    const col = (...names) => head.findIndex(h => names.some(n => h === n || h.startsWith(n)));
+    let iCode = col('code', 'bonus', 'id', 'abbr'), iLat = col('lat'), iLon = col('lon', 'long', 'lng'),
+      iPts = col('point', 'pts', 'value', 'score'), iAv = col('avail', 'hour', 'window', 'time', 'open'),
+      iName = col('name', 'title', 'description');
+    let start = 1;
+    if (iLat < 0 || iLon < 0) { // no header row: guess CODE,LAT,LON,POINTS,AVAIL
+      iCode = 0; iLat = 1; iLon = 2; iPts = 3; iAv = 4; start = 0;
+    }
+    const rows = [], warnings = [];
+    for (let k = start; k < lines.length; k++) {
+      const f = splitCSVLine(lines[k], sep);
+      const code = (f[iCode] || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!code) continue;
+      const lat = parseCoord(f[iLat]), lon = parseCoord(f[iLon]);
+      rows.push({ code, lat, lon, points: iPts >= 0 ? num(f[iPts]) : null, avail: iAv >= 0 ? (f[iAv] || '') : '', name: iName >= 0 && iName !== iCode ? f[iName] : '' });
+      if (lat == null || lon == null) warnings.push(`CSV row ${k + 1} (${code}): could not read coordinates`);
+    }
+    return { rows, warnings };
+  }
+
+  // ---------------------------------------------------------------- GPX
+  function xmlText(s) { return s == null ? '' : s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'").trim(); }
+  function parseGPX(text) {
+    const wpts = [];
+    const re = /<wpt\b([^>]*)>([\s\S]*?)<\/wpt>/g; let m;
+    while ((m = re.exec(text))) {
+      const attrs = m[1], body = m[2];
+      const lat = num((attrs.match(/lat\s*=\s*["']([^"']+)/) || [])[1]);
+      const lon = num((attrs.match(/lon\s*=\s*["']([^"']+)/) || [])[1]);
+      const tag = t => xmlText((body.match(new RegExp(`<${t}>([\\s\\S]*?)</${t}>`)) || [])[1]);
+      wpts.push({ name: tag('name'), cmt: tag('cmt'), desc: tag('desc'), lat, lon });
+    }
+    return { wpts };
+  }
+
+  // ---------------------------------------------------------------- rally book (text lines from the PDF)
+  function parseBook(lines, knownCodes) {
+    knownCodes = knownCodes || new Set();
+    const L = lines.map(l => l.replace(/\s+$/, ''));
+    const sepLine = l => /^\s*[*_=~\-]{8,}\s*$/.test(l);
+    const pageLine = l => /^\s*page\s+\d+\s+of\s+\d+\s*$/i.test(l);
+    // header lines: "CODE   Name" where CODE is known, or followed by a Points line within 4 lines
+    const heads = [];
+    for (let i = 0; i < L.length; i++) {
+      const m = L[i].trim().match(/^([A-Z0-9]{2,8})(?:\s{2,}|\t|\s+[-–:]\s+|\s+)(\S.*)$/);
+      if (!m || !isCode(m[1])) continue;
+      const known = knownCodes.has(m[1]);
+      const loose = /\s{2,}|\t/.test(L[i].trim().slice(m[1].length, m[1].length + 3));
+      const near = L.slice(i, i + 5).some(x => /points?\s*[:=]/i.test(x));
+      const close = L.slice(i + 1, i + 3).some(x => /^\s*(?:[^:]*\s)?points?\s*[:=]\s*\d/i.test(x)); // unknown codes (e.g. combos) need Points right below
+      if ((known && near) || (loose && near) || close || (known && /^\s*[A-Z0-9]{2,8}\s{2,}/.test(L[i]))) heads.push({ i, code: m[1], rest: m[2].trim() });
+    }
+    const bonuses = {}, combos = [];
+    for (let h = 0; h < heads.length; h++) {
+      const from = heads[h].i, to = h + 1 < heads.length ? heads[h + 1].i : L.length;
+      let block = L.slice(from, to);
+      const cut = block.findIndex((l, k) => k > 0 && sepLine(l));
+      if (cut > 0) block = block.slice(0, cut);
+      block = block.filter(l => !pageLine(l));
+      const text = block.join('\n');
+      const ptsM = text.match(/points?\s*[:=]\s*([\d,]+)/i);
+      const points = ptsM ? num(ptsM[1]) : null;
+      const avM = text.match(/(?:available|availability|hours|open)\s*[:=]\s*([^\n]+)/i);
+      const coord = findCoordPair(text);
+      // second line usually "City, ST    Points: 510"
+      const city = (block[1] || '').split(/\s{2,}|points?\s*:/i)[0].trim();
+      const instr = [];
+      let inTake = false;
+      for (const l of block.slice(1)) {
+        const t = l.trim();
+        if (/^(note|caution|warning)\b/i.test(t)) { inTake = false; continue; }
+        if (/^(take|photograph|photo of|submit|answer|record|bring)\b/i.test(t)) inTake = true;
+        if (inTake) instr.push(t);
+      }
+      const notes = [];
+      for (let k = 0; k < block.length; k++) {
+        if (/^\s*(note|caution|warning)\b/i.test(block[k])) {
+          let n = block[k].trim();
+          while (k + 1 < block.length && block[k + 1].trim() && !/^\s*(note|caution|warning|take)\b/i.test(block[k + 1])) n += ' ' + block[++k].trim();
+          notes.push(n);
+        }
+      }
+      // combination bonus: lists several other bonus codes
+      const memberText = (text.match(/(?:claim|bonuses|members?|consists? of|requires?|visit)[^:\n]*:?([\s\S]*)$/i) || [, ''])[1];
+      const members = [...new Set((memberText.match(/\b[A-Z0-9]{2,8}\b/g) || []).filter(c => c !== heads[h].code && (knownCodes.has(c) || heads.some(x => x.code === c && !/combo/i.test(x.rest)))))];
+      const looksCombo = /combo|combination/i.test(heads[h].rest + ' ' + text.slice(0, 300)) || (!coord && members.length >= 2);
+      if (looksCombo && members.length >= 2) {
+        combos.push({ code: heads[h].code, name: heads[h].rest.replace(/\s{2,}.*/, ''), points: points || 0, members });
+        continue;
+      }
+      // parking / safety coordinates given in a NOTE override the routing target
+      let park = null;
+      for (const n of notes) if (/park|coordinates? (?:are|is) to|access/i.test(n)) { const c = findCoordPair(n); if (c) park = c; }
+      bonuses[heads[h].code] = {
+        code: heads[h].code, name: heads[h].rest.replace(/\s{2,}.*/, '').trim(), city,
+        points, lat: coord ? coord.lat : null, lon: coord ? coord.lon : null,
+        avail: avM ? avM[1].trim() : null, proof: instr.join(' '), notes, park
+      };
+    }
+    // rally clock and penalties
+    const all = L.join('\n');
+    const rally = {};
+    const se = all.match(/start\w*\s+(?:at\s+)?(\d{1,2}:\d{2}\s*[ap]\.?m\.?)[\s\S]{0,80}?end\w*\s+(?:at\s+)?(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
+    if (se) { rally.start = parseClock(se[1]).min; rally.end = parseClock(se[2]).min; }
+    const pen = all.match(/[^\n]*penalt[^\n]*(?:\n[^\n]+){0,5}/i) || all.match(/[^\n]*\blate (?:finish|arrival)[^\n]*(?:\n[^\n]+){0,4}/i);
+    if (pen) rally.penaltyText = pen[0].replace(/\s+/g, ' ').trim();
+    const tz = all.match(/\b(Eastern|Central|Mountain|Pacific)\s+(?:Standard\s+|Daylight\s+)?Time\b/i);
+    if (tz) rally.timezone = tz[0];
+    return { bonuses, combos, rally };
+  }
+
+  // ---------------------------------------------------------------- merge
+  function gpxCode(name) { const t = (name || '').trim().split(/[\s\-_:,]+/)[0].toUpperCase(); return isCode(t) && t.length >= 3 ? t : null; }
+
+  function merge({ book, csv, gpx }) {
+    const issues = [];
+    const B = (book && book.bonuses) || {}, C = {}, G = {};
+    (csv ? csv.rows : []).forEach(r => { C[r.code] = r; });
+    const others = [];
+    (gpx ? gpx.wpts : []).forEach(w => {
+      const c = gpxCode(w.name);
+      if (c && (B[c] || C[c] || !Object.keys(B).length && !Object.keys(C).length)) G[c] = w;
+      else others.push(w);
+    });
+    // GPX names that are codes but unknown to book/CSV still count when no other source has them
+    if (Object.keys(B).length || Object.keys(C).length) {
+      others.slice().forEach(w => {
+        const c = gpxCode(w.name), p = num(((w.cmt || '') + ' ' + (w.desc || '')).match(/([\d,]+)\s*(?:pts|points)/i)?.[1]);
+        if (c && p > 0) { G[c] = w; others.splice(others.indexOf(w), 1); }
+      });
+    }
+    const codes = [...new Set([...Object.keys(B), ...Object.keys(C), ...Object.keys(G)])].sort();
+    const rallyRef = { start: (book && book.rally.start) ?? 420, end: (book && book.rally.end) ?? 1020 };
+    const bonuses = [];
+    for (const code of codes) {
+      const b = B[code] || {}, c = C[code] || {}, g = G[code] || {};
+      const gp = num(((g.cmt || '') + ' ' + (g.desc || '')).match(/([\d,]+)\s*(?:pts|points)/i)?.[1]);
+      const pts = [b.points, c.points, gp].filter(v => v != null);
+      const points = b.points ?? c.points ?? gp;
+      if (new Set(pts).size > 1) issues.push({ level: 'warn', code, text: `${code}: point values disagree (${[b.points != null ? `book ${b.points}` : '', c.points != null ? `CSV ${c.points}` : '', gp != null ? `GPX ${gp}` : ''].filter(Boolean).join(', ')}). Using ${points}.` });
+      const coordSrc = [['CSV', c], ['book', b], ['GPX', g]].filter(([, s]) => s.lat != null && s.lon != null);
+      const [srcName, src] = coordSrc[0] || [null, null];
+      if (!src) { issues.push({ level: 'error', code, text: `${code}: no coordinates in any file, so it cannot be routed.` }); }
+      for (const [n2, s2] of coordSrc.slice(1)) {
+        const d = hav(src, s2) * 1609.34;
+        if (d > 150) issues.push({ level: 'warn', code, text: `${code}: ${srcName} and ${n2} coordinates are ${Math.round(d)} m apart. Using ${srcName}.` });
+      }
+      const availRaw = b.avail ?? (c.avail || null);
+      const win = parseWindow(availRaw, rallyRef);
+      if (win.type === 'unknown') issues.push({ level: 'warn', code, text: `${code}: could not read availability "${availRaw}". Treated as always open.` });
+      if (win.type === 'win' && win.assumed) issues.push({ level: 'info', code, text: `${code}: window "${availRaw}" has no AM/PM. Read as ${windowText(win)}.` });
+      if (b.avail && c.avail && win.type === 'win') {
+        const w2 = parseWindow(c.avail, rallyRef);
+        if (w2.type === 'win' && (w2.open !== win.open || w2.close !== win.close)) issues.push({ level: 'warn', code, text: `${code}: book window ${windowText(win)} vs CSV ${windowText(w2)}. Using the book.` });
+      }
+      if (points == null) issues.push({ level: 'warn', code, text: `${code}: no point value found. Scored as 0.` });
+      const notes = b.notes || [];
+      const blob = (notes.join(' ') + ' ' + (b.proof || '')).toLowerCase();
+      let extra = 0;
+      if (/walk|yards|hike|trail/.test(blob)) extra += 5;
+      if (/gravel|dirt|unpaved|sand/.test(blob)) extra += 3;
+      if (/security|license|gate|guard|check.?in/.test(blob)) extra += 5;
+      if (/fee|\$\d/.test(blob)) extra += 3;
+      bonuses.push({
+        code, name: b.name || c.name || g.desc || g.cmt || code, city: b.city || '',
+        points: points || 0, lat: src ? src.lat : null, lon: src ? src.lon : null,
+        rlat: b.park ? b.park.lat : (src ? src.lat : null), rlon: b.park ? b.park.lon : (src ? src.lon : null),
+        win, availRaw, proof: b.proof || '', notes, extraStop: extra,
+        bike: /motorcycle|your bike/i.test(b.proof || ''),
+        sources: [B[code] && 'book', C[code] && 'CSV', G[code] && 'GPX'].filter(Boolean)
+      });
+    }
+    const combos = ((book && book.combos) || []).map(cb => ({ ...cb, members: cb.members.filter(m => codes.includes(m)) })).filter(cb => cb.members.length >= 2);
+    const places = others.filter(w => w.lat != null).map(w => ({ name: w.name, lat: w.lat, lon: w.lon }));
+    const startGuess = places.find(p => /hq|start|finish|headquart|hotel|check.?point|base/i.test(p.name)) || places[0] || null;
+    if (!startGuess) issues.push({ level: 'info', text: 'No start/finish waypoint found. Click "Set on map" to choose one.' });
+    if (!book) issues.push({ level: 'info', text: 'No rally book PDF loaded. Proof instructions, combos and rally hours come from the PDF.' });
+    return { bonuses, combos, places, start: startGuess, rally: (book && book.rally) || {}, issues };
+  }
+
+  // ---------------------------------------------------------------- model
+  // matrix: { n, sec: number[n*n], m: number[n*n] } over points [start, finish, ...bonuses]
+  function buildModel(data, matrix, s) {
+    const bon = data.bonuses.filter(b => b.rlat != null && !s.excluded.includes(b.code));
+    // matrix rows are [start, finish, ...routable bonuses in data order]
+    const idxOf = new Map(data.bonuses.filter(b => b.rlat != null).map((b, i) => [b.code, i]));
+    const n = bon.length + 2, S = 0, F = n - 1;
+    const mapM = k => k === S ? 0 : k === F ? 1 : 2 + idxOf.get(bon[k - 1].code);
+    const N0 = matrix.n;
+    const D = new Float64Array(n * n), T = new Float64Array(n * n);
+    const speed = s.calib / (s.pace / 100);
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const a = mapM(i), b = mapM(j);
+      const sec = matrix.sec[a * N0 + b], met = matrix.m[a * N0 + b];
+      D[i * n + j] = met == null || !isFinite(met) ? 1e6 : met / 1609.344;
+      T[i * n + j] = sec == null || !isFinite(sec) ? 1e6 : (sec / 60) * speed;
+    }
+    const P = new Float64Array(n), STOP = new Float64Array(n), WIN = new Array(n).fill(null);
+    bon.forEach((b, k) => {
+      const u = k + 1;
+      P[u] = b.points; STOP[u] = s.stopMin + (s.autoExtra ? b.extraStop : 0) + (s.extraStop[b.code] || 0);
+      if (b.win.type === 'win') WIN[u] = [b.win.open, b.win.close];
+      else if (b.win.type === 'daylight') WIN[u] = [s.sunrise, s.sunset];
+    });
+    const codeIdx = new Map(bon.map((b, k) => [b.code, k + 1]));
+    const combos = data.combos.map(c => ({ code: c.code, name: c.name, points: c.points, members: c.members.map(m => codeIdx.get(m)).filter(Boolean), total: c.members.length }))
+      .filter(c => c.members.length === c.total);
+    const comboOf = Array.from({ length: n }, () => []);
+    combos.forEach((c, ci) => c.members.forEach(u => comboOf[u].push(ci)));
+    const end = s.end > s.start ? s.end : s.end + DAY;
+    const geo = [{ lat: s.startLat ?? 0, lon: s.startLon ?? 0 }, ...bon.map(b => ({ lat: b.rlat, lon: b.rlon })), null];
+    return {
+      n, S, F, D, T, P, STOP, WIN, combos, comboOf, bon, codeIdx, geo: s.startLat != null ? geo : null,
+      start: s.start, deadline: end - s.buffer, end,
+      usable: s.range * (1 - s.reserve / 100), fuelMin: s.fuelMin, margin: s.winMargin,
+      required: s.required.map(c => codeIdx.get(c)).filter(Boolean)
+    };
+  }
+
+  // earliest time >= t that is inside a (daily repeating) window [o, c - margin]
+  function nextOpen(t, w, margin) {
+    let [o, c] = w; if (c <= o) c += DAY; c -= margin;
+    const d0 = Math.floor(t / DAY) - 1;
+    for (let d = d0; d < d0 + 4; d++) {
+      const a = d * DAY + o, b = d * DAY + c;
+      if (t <= b) return Math.max(t, a);
+    }
+    return t + DAY;
+  }
+
+  function simulate(M, route, detail) {
+    let t = M.start, miles = 0, since = 0, viol = 0, prev = M.S, wait = 0, fuels = 0;
+    const legs = detail ? [] : null;
+    const L = route.length;
+    for (let k = 0; k <= L; k++) {
+      const u = k < L ? route[k] : M.F;
+      const d = M.D[prev * M.n + u], rt = M.T[prev * M.n + u];
+      let fuel = false;
+      if (since + d > M.usable && since > 0) { t += M.fuelMin; since = 0; fuel = true; fuels++; }
+      if (d > M.usable) viol += 999;
+      t += rt; miles += d; since += d;
+      const arr = t; let w = 0;
+      if (M.WIN[u]) {
+        const nt = nextOpen(t, M.WIN[u], M.margin);
+        if (nt - t > 600) viol += nt - t; // window missed: would need to wait for the next day
+        w = nt - t; wait += w; t = nt;
+      }
+      t += M.STOP[u];
+      if (detail) legs.push({ to: u, mi: d, ride: rt, arr, wait: w, photo: arr + w, depart: t, fuel, odo: miles });
+      prev = u;
+    }
+    if (t > M.deadline) viol += t - M.deadline;
+    return { viol, finish: t, miles, legs, wait, fuels };
+  }
+
+  function score(M, route) {
+    let p = 0; const inr = new Uint8Array(M.n);
+    for (const u of route) { p += M.P[u]; inr[u] = 1; }
+    const got = [];
+    for (const c of M.combos) if (c.members.every(u => inr[u])) { p += c.points; got.push(c.code); }
+    return { points: p, combos: got };
+  }
+
+  // ---------------------------------------------------------------- search
+  function rng(seed) { let x = seed >>> 0 || 1; return () => ((x = (x * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+  function Searcher(M, lam) {
+    const n = M.n;
+    const feasible = r => simulate(M, r).viol === 0;
+    const obj = r => { const s = score(M, r).points; return lam ? s - lam * simulate(M, r).miles : s; };
+    const req = new Set(M.required);
+
+    function valOf(u, inr) {
+      let v = M.P[u];
+      for (const ci of M.comboOf[u]) {
+        const c = M.combos[ci]; let missing = 0;
+        for (const x of c.members) if (!inr[x] && x !== u) missing++;
+        if (missing === 0) v += c.points; else if (missing <= 2) v += c.points * 0.25;
+      }
+      return v;
+    }
+
+    function greedy(route, rnd, alpha, forbid) {
+      for (;;) {
+        const inr = new Uint8Array(n); route.forEach(u => inr[u] = 1);
+        const seq = [M.S, ...route, M.F], cands = [];
+        for (let u = 1; u < n - 1; u++) {
+          if (inr[u] || (forbid && forbid.has(u))) continue;
+          let bd = 1e18, bp = 0;
+          for (let p = 0; p < seq.length - 1; p++) {
+            const a = seq[p], b = seq[p + 1];
+            const dt = M.T[a * n + u] + M.STOP[u] + M.T[u * n + b] - M.T[a * n + b];
+            if (dt < bd) { bd = dt; bp = p; }
+          }
+          const a = seq[bp], b = seq[bp + 1];
+          const dm = M.D[a * n + u] + M.D[u * n + b] - M.D[a * n + b];
+          const v = valOf(u, inr) - lam * dm;
+          if (v <= 0 || bd > 1e5) continue;
+          cands.push([Math.pow(v, alpha) / (Math.max(bd, 0) + 2) * (1 + 0.15 * rnd()), u, bp]);
+        }
+        cands.sort((x, y) => y[0] - x[0]);
+        let added = false;
+        const base = lam ? obj(route) : 0;
+        for (let c = 0; c < Math.min(40, cands.length) && !added; c++) {
+          const [, u, p] = cands[c];
+          const qs = []; for (let q = 0; q <= route.length; q++) qs.push(q);
+          qs.sort((x, y) => Math.abs(x - p) - Math.abs(y - p));
+          for (const q of qs.slice(0, 5)) {
+            const r = route.slice(0, q).concat([u], route.slice(q));
+            if (feasible(r) && (!lam || obj(r) > base)) { route = r; added = true; break; }
+          }
+        }
+        if (!added) return route;
+      }
+    }
+
+    // re-sequence to minimise (violation, finish time)
+    function tighten(route, allowInfeasible) {
+      const cost = r => { const s = simulate(M, r); return s.viol * 1e4 + s.finish; };
+      let best = cost(route), imp = true;
+      while (imp) {
+        imp = false; const L = route.length;
+        for (let i = 0; i < L - 1; i++) for (let j = i + 1; j < Math.min(L, i + 14); j++) {
+          const r = route.slice(0, i).concat(route.slice(i, j + 1).reverse(), route.slice(j + 1));
+          const c = cost(r); if (c < best - 0.05) { route = r; best = c; imp = true; }
+        }
+        for (let i = 0; i < route.length; i++) for (let j = 0; j < route.length; j++) {
+          if (i === j) continue;
+          const r = route.slice(0, i).concat(route.slice(i + 1)); r.splice(j, 0, route[i]);
+          const c = cost(r); if (c < best - 0.05) { route = r; best = c; imp = true; }
+        }
+      }
+      return route;
+    }
+
+    function dropBad(route) {
+      if (!lam) return route;
+      for (;;) {
+        const b = obj(route); let best = null;
+        for (let i = 0; i < route.length; i++) {
+          if (req.has(route[i])) continue;
+          const r = route.slice(0, i).concat(route.slice(i + 1));
+          const e = obj(r); if (e > b && (!best || e > best[0])) best = [e, r];
+        }
+        if (!best) return route; route = best[1];
+      }
+    }
+
+    function seed(nodes) {
+      let r = [];
+      for (const u of nodes) {
+        let best = null;
+        for (let q = 0; q <= r.length; q++) {
+          const x = r.slice(0, q).concat([u], r.slice(q)); const s = simulate(M, x);
+          const c = s.viol * 1e4 + s.finish; if (!best || c < best[0]) best = [c, x];
+        }
+        r = best[1];
+      }
+      return tighten(r, true);
+    }
+
+    // 1-for-1 swaps: trade a route bonus for a nearby unvisited one when that scores more
+    function exchange(route, rnd, alpha, untilMs) {
+      let improved = true;
+      while (improved && Date.now() < untilMs) {
+        improved = false;
+        const inr = new Uint8Array(n); route.forEach(u => inr[u] = 1);
+        const cur = obj(route);
+        for (let i = 0; i < route.length && !improved; i++) {
+          const u = route[i]; if (req.has(u)) continue;
+          for (let v = 1; v < n - 1 && !improved; v++) {
+            if (inr[v] || M.D[u * n + v] > 60) continue;
+            if (valOf(v, inr) + 1e-9 < M.P[u] && !lam) continue;
+            let r = route.slice(); r[i] = v;
+            if (!feasible(r)) { r = tighten(r); if (!feasible(r)) continue; }
+            if (obj(r) > cur + 1e-9) { route = greedy(r, rnd, alpha); improved = true; }
+          }
+        }
+      }
+      return route;
+    }
+
+    function local(r, rnd, alpha, untilMs) {
+      r = greedy(r, rnd, alpha); r = tighten(r); r = greedy(r, rnd, alpha);
+      if (untilMs) r = exchange(r, rnd, alpha, untilMs);
+      return dropBad(r);
+    }
+
+    function better(a, b) {
+      const oa = obj(a), ob = obj(b);
+      return oa > ob + 1e-9 || (Math.abs(oa - ob) < 1e-9 && simulate(M, a).finish < simulate(M, b).finish - 0.5);
+    }
+
+    function ils(start, rnd, deadlineMs, alpha, polish) {
+      let cur = local(start, rnd, alpha, polish ? deadlineMs : 0), best = cur.slice();
+      while (Date.now() < deadlineMs) {
+        if (!cur.length) break;
+        let r;
+        const c = cur[Math.floor(rnd() * cur.length)];
+        const rad = [15, 30, 50, 80][Math.floor(rnd() * 4)];
+        if (rnd() < 0.7) r = cur.filter(u => req.has(u) || M.D[c * n + u] > rad);
+        else r = cur.filter(u => req.has(u) || rnd() > 0.3);
+        r = tighten(r);
+        const forbid = rnd() < 0.5 ? new Set([c]) : null;
+        r = greedy(r, rnd, alpha, forbid); r = local(r, rnd, alpha);
+        if (!feasible(r)) continue;
+        if (polish && obj(r) > obj(best) - 400) r = exchange(r, rnd, alpha, deadlineMs);
+        if (better(r, cur) || rnd() < 0.05) cur = r;
+        if (better(r, best)) best = r.slice();
+      }
+      return best;
+    }
+    return { greedy, tighten, seed, ils, local, obj, feasible, better };
+  }
+
+  // budgetMs: wall-clock for this scenario. onProgress(fraction, bestRoute)
+  function optimize(M, opts) {
+    const { budgetMs = 8000, lam = 0, seed = 7, onProgress } = opts || {};
+    const S = Searcher(M, lam), rnd = rng(seed), t0 = Date.now();
+    const notes = [];
+    let base = [];
+    if (M.required.length) {
+      base = S.seed(M.required);
+      if (!S.feasible(base)) { notes.push('The "must visit" bonuses cannot all be reached in time; they were treated as optional.'); M = { ...M, required: [] }; base = []; }
+    }
+    // anchors: empty, each top bonus, each combo set
+    const order = [];
+    for (let u = 1; u < M.n - 1; u++) order.push(u);
+    order.sort((a, b) => M.P[b] - M.P[a]);
+    // anchors span the value ranking, every time-windowed bonus, and each compass sector around the start
+    const pick = new Set(order.slice(0, 10));
+    for (let u = 1; u < M.n - 1; u++) if (M.WIN[u]) pick.add(u);
+    const sector = new Map();
+    for (const u of order) {
+      if (!M.geo || M.D[M.S * M.n + u] < 30) continue;
+      const g = M.geo[u], s0 = M.geo[M.S];
+      const k = Math.floor(((Math.atan2(g.lat - s0.lat, (g.lon - s0.lon) * Math.cos(s0.lat * Math.PI / 180)) + Math.PI) / (2 * Math.PI)) * 8) % 8;
+      if (!sector.has(k)) sector.set(k, u);
+    }
+    sector.forEach(u => pick.add(u));
+    const anchors = [[], ...[...pick].map(u => [u])];
+    M.combos.forEach(c => anchors.push(c.members.slice()));
+    for (let i = anchors.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [anchors[i], anchors[j]] = [anchors[j], anchors[i]]; }
+    const pool = [];
+    const ph1 = budgetMs * 0.25, per = ph1 / anchors.length;
+    for (let a = 0; a < anchors.length; a++) {
+      let r = S.seed([...new Set([...base, ...anchors[a]])]);
+      if (!S.feasible(r)) continue;
+      const out = S.ils(r, rnd, Math.min(Date.now() + per, t0 + ph1), [1, 1.3, 1.6][a % 3]);
+      pool.push(out);
+      onProgress && onProgress(Math.min(0.25, (Date.now() - t0) / budgetMs), best(pool));
+    }
+    if (!pool.length) pool.push(base.length ? base : []);
+    // later rounds: more time for fewer starts, chosen from different regions (low overlap of bonus sets)
+    const diverse = k => {
+      const sorted = pool.slice().sort((x, y) => S.obj(y) - S.obj(x)), tops = [];
+      for (const r of sorted) {
+        const set = new Set(r);
+        if (tops.every(t => t.filter(u => set.has(u)).length < 0.5 * Math.min(t.length, r.length))) tops.push(r);
+        if (tops.length >= k) break;
+      }
+      return tops;
+    };
+    const round = (tops, until, polish, f0, f1) => {
+      const t1 = Date.now();
+      for (let i = 0; i < tops.length; i++) {
+        const out = S.ils(tops[i], rnd, t1 + (until - t1) * (i + 1) / tops.length, [1, 1.3, 1.6][i % 3], polish);
+        pool.push(out);
+        onProgress && onProgress(f0 + (f1 - f0) * (i + 1) / tops.length, best(pool));
+      }
+    };
+    round(diverse(6), t0 + budgetMs * 0.6, false, 0.25, 0.6);
+    round(diverse(2), t0 + budgetMs, true, 0.6, 0.99);
+    return { route: best(pool), notes };
+    function best(p) { let b = null; for (const r of p) if (!b || S.better(r, b)) b = r; return b || []; }
+  }
+
+  function describe(M, route) {
+    const sim = simulate(M, route, true), sc = score(M, route);
+    let run = 0;
+    const legs = sim.legs.map((l, k) => {
+      const isF = l.to === M.F, b = isF ? null : M.bon[l.to - 1];
+      if (b) run += b.points;
+      return { ...l, code: b ? b.code : 'FINISH', points: b ? b.points : 0, running: run, stop: isF ? 0 : M.STOP[l.to], win: b ? b.win : null };
+    });
+    const ride = sim.legs.reduce((a, l) => a + l.ride, 0);
+    return { route: route.map(u => M.bon[u - 1].code), points: sc.points, combos: sc.combos, miles: sim.miles, finish: sim.finish, deadline: M.deadline, end: M.end, ride, wait: sim.wait, fuels: sim.fuels, viol: sim.viol, legs };
+  }
+
+  const api = { parseCoord, findCoordPair, parseClock, parseWindow, windowText, fmtTime, parseCSV, parseGPX, parseBook, merge, buildModel, simulate, score, optimize, describe, hav };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.RallyEngine = api;
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+(() => {
+  'use strict';
+  const E = window.RallyEngine;
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('rrp:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('rrp:' + k, JSON.stringify(v)); } catch { /* storage full or blocked */ } }
+  };
+  const toMin = hhmm => { const [h, m] = String(hhmm || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
+  const toHHMM = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+  const fmtH = m => `${Math.floor(m / 60)}h ${String(Math.round(m % 60)).padStart(2, '0')}m`;
+  const fmtN = n => Math.round(n).toLocaleString();
+
+  const DEFAULTS = { range: 250, mpg: 40, reserve: 15, mph: 50, stopMin: 10, fuelMin: 10, start: '07:00', end: '17:00', buffer: 30,
+    depth: 'standard', winMargin: 5, sunrise: '07:00', sunset: '17:30', fuelPrice: 3.25, calib: 0.8, autoExtra: 'true' };
+  const S = { ...DEFAULTS, ...store.get('settings', {}) };
+  const BUDGET = { quick: 8000, standard: 20000, deep: 60000 };
+  const PALETTE = ['#f5d18a', '#f2a65a', '#e4572e', '#b5325b', '#6b2160'];
+
+  const st = {
+    files: [], book: null, csv: null, gpx: null, data: null,
+    places: [], startIdx: 0, finishIdx: -1, custom: { start: null, finish: null },
+    required: new Set(store.get('required', [])), excluded: new Set(store.get('excluded', [])),
+    matrix: null, results: {}, active: 'max', running: false, pick: null, bins: []
+  };
+
+  // ------------------------------------------------------------ toast
+  let toastT;
+  function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), ms); }
+
+  // ------------------------------------------------------------ theme + map
+  const map = L.map('map', { zoomControl: false, attributionControl: true }).setView([37.5, -92], 4);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  map.createPane('labels').style.zIndex = 350; // town names above the base map, below routes and markers
+  map.getPane('labels').style.pointerEvents = 'none';
+  let tiles = [];
+  function isDark() {
+    const t = document.documentElement.dataset.theme;
+    return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function setTiles() {
+    tiles.forEach(t => map.removeLayer(t));
+    const tone = isDark() ? 'Dark' : 'Light';
+    const esri = s => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${tone}_Gray_${s}/MapServer/tile/{z}/{y}/{x}`;
+    tiles = [
+      L.tileLayer(esri('Base'), { maxZoom: 16, attribution: 'Tiles © <a href="https://www.esri.com">Esri</a>, HERE, Garmin, © OpenStreetMap contributors' }),
+      L.tileLayer(esri('Reference'), { maxZoom: 16, pane: 'labels' })
+    ];
+    tiles.forEach(t => t.addTo(map));
+  }
+  const savedTheme = store.get('theme', null);
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  setTiles();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!document.documentElement.dataset.theme) setTiles(); });
+  $('#theme').onclick = () => {
+    const next = isDark() ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next; store.set('theme', next); setTiles(); drawRoute();
+  };
+  const layers = { bonus: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map), pins: L.layerGroup().addTo(map), ends: L.layerGroup().addTo(map) };
+  const markerOf = new Map();
+
+  // ------------------------------------------------------------ settings form
+  function bindForm() {
+    document.querySelectorAll('[data-key]').forEach(el => {
+      const k = el.dataset.key;
+      el.value = S[k];
+      el.addEventListener('input', () => {
+        S[k] = el.type === 'number' || el.type === 'range' ? +el.value : el.value;
+        // the mph box and slider share one setting: mirror the edit into the other control
+        document.querySelectorAll(`[data-key="${k}"]`).forEach(o => { if (o !== el) o.value = S[k]; });
+        store.set('settings', S); refreshPace();
+      });
+    });
+    document.querySelectorAll('#depth button').forEach(b => {
+      b.classList.toggle('on', b.dataset.v === S.depth);
+      b.onclick = () => { S.depth = b.dataset.v; store.set('settings', S); document.querySelectorAll('#depth button').forEach(x => x.classList.toggle('on', x === b)); };
+    });
+    refreshPace();
+  }
+  // Average posted-limit speed over this rally's typical legs (10-150 mi), from the road matrix.
+  // Entering X mph scales every leg by X / this, so interstates stay faster than towns.
+  function refMph() {
+    const mx = st.matrix; if (!mx) return null;
+    let mi = 0, h = 0;
+    for (let k = 0; k < mx.n * mx.n; k++) {
+      const m = mx.m[k], sec = mx.sec[k];
+      if (!m || !sec) continue;
+      const x = m / 1609.344; if (x < 10 || x > 150) continue;
+      mi += x; h += sec * (+S.calib) / 3600;
+    }
+    return h ? mi / h : null;
+  }
+  function pacePct() { const r = refMph() || 56; return 100 * (+S.mph) / r; }
+  function refreshPace() {
+    const v = +S.mph || 0, el = $('#mphRange');
+    el.style.setProperty('--p', Math.max(0, Math.min(100, (v - 30) / 70 * 100)) + '%');
+    const r = refMph();
+    if (!r) { $('#paceHint').innerHTML = 'Your speed is applied road by road (faster on interstates, slower in towns) once road distances are measured.'; return; }
+    const p = Math.round(100 * v / r);
+    $('#paceHint').innerHTML = `Riding at the posted limits averages <b>${r.toFixed(0)} mph</b> on this rally's roads, so ${v} mph is <b>${p}%</b> of the limits` +
+      (p > 100 ? `. <span class="over">This assumes riding above posted limits.</span>` : `: about ${Math.round(70 * p / 100)} mph where the limit is 70 and ${Math.round(55 * p / 100)} mph where it is 55.`);
+  }
+  function tryCachedMatrix() {
+    if (!st.data || !startPoint()) return;
+    const pts = matrixPoints();
+    const key = hash(pts.map(p => p.lat.toFixed(5) + ',' + p.lon.toFixed(5)).join(';'));
+    const cached = store.get('matrix', null);
+    if (cached && cached.key === key) { st.matrix = cached; refreshPace(); }
+  }
+
+  // ------------------------------------------------------------ files
+  const drop = $('#drop');
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => addFiles([...e.dataTransfer.files]));
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) addFiles([...e.dataTransfer.files]); });
+  $('#fileIn').addEventListener('change', e => { addFiles([...e.target.files]); e.target.value = ''; });
+
+  function kindOf(f) {
+    const x = f.name.toLowerCase().split('.').pop();
+    return x === 'pdf' ? 'PDF' : x === 'gpx' ? 'GPX' : (x === 'csv' || x === 'tsv') ? 'CSV' : x === 'txt' ? 'TXT' : null;
+  }
+  async function addFiles(list) {
+    for (const f of list) {
+      const k = kindOf(f);
+      if (!k) { toast(`Skipped ${f.name}: use PDF, CSV or GPX`); continue; }
+      st.files = st.files.filter(x => x.name !== f.name);
+      st.files.push({ name: f.name, kind: k, file: f, status: 'reading' });
+    }
+    renderChips();
+    await parseAll();
+  }
+  function renderChips() {
+    $('#fileChips').innerHTML = st.files.map((f, i) =>
+      `<span class="chip" title="${esc(f.name)}"><b>${f.kind}</b><i>${esc(f.name)}</i>${f.status === 'reading' ? '…' : f.status === 'error' ? '⚠' : ''}<button class="x" data-i="${i}" title="Remove">✕</button></span>`).join('');
+    $('#fileChips').querySelectorAll('.x').forEach(b => b.onclick = e => { e.preventDefault(); st.files.splice(+b.dataset.i, 1); renderChips(); parseAll(); });
+  }
+
+  let pdfReady = null;
+  function initPdf() {
+    if (pdfReady) return pdfReady;
+    const url = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    // the worker is fetched, checked against a pinned SHA-384 hash, then started from a same-origin blob
+    const pinned = 'SnzOobpRMLXZ52iJvZm/C0fYw0OQemTXzTjIsdsfMcrCtCEe9qgzxTd3RSklO5x2';
+    pdfReady = fetch(url).then(r => r.arrayBuffer()).then(async buf => {
+      const h = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-384', buf))));
+      if (h !== pinned) throw new Error('PDF reader failed its integrity check');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([buf], { type: 'text/javascript' }));
+    });
+    pdfReady.catch(err => { pdfReady = null; toast(err.message || 'Could not load the PDF reader'); });
+    return pdfReady;
+  }
+  async function pdfLines(buf) {
+    await initPdf();
+    const pdf = await pdfjsLib.getDocument({ data: buf, isEvalSupported: false }).promise;
+    const out = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const tc = await (await pdf.getPage(p)).getTextContent();
+      const rows = [];
+      for (const it of tc.items) {
+        if (!it.str) continue;
+        const x = it.transform[4], y = it.transform[5], h = Math.abs(it.transform[3]) || 10;
+        let r = rows.find(r => Math.abs(r.y - y) < h * 0.45);
+        if (!r) { r = { y, h, items: [] }; rows.push(r); }
+        r.items.push({ x, w: it.width, s: it.str });
+      }
+      rows.sort((a, b) => b.y - a.y);
+      for (const r of rows) {
+        r.items.sort((a, b) => a.x - b.x);
+        let s = '', end = null;
+        for (const it of r.items) {
+          if (end != null) {
+            const gap = it.x - end;
+            if (gap > r.h * 1.5) s = s.replace(/\s+$/, '') + '    ';
+            else if (gap > r.h * 0.12 && !/\s$/.test(s) && !/^\s/.test(it.s)) s += ' ';
+          }
+          s += it.s; end = it.x + it.w;
+        }
+        if (s.trim()) out.push(s);
+      }
+      out.push('*'.repeat(20));
+    }
+    return out;
+  }
+
+  async function parseAll() {
+    st.csv = st.gpx = st.book = null;
+    const csvs = [], gpxs = [], books = [];
+    for (const f of st.files) {
+      try {
+        if (f.kind === 'CSV') {
+          const buf = await f.file.arrayBuffer();
+          let text = new TextDecoder('utf-8').decode(buf);
+          if (text.includes('�')) text = new TextDecoder('windows-1252').decode(buf);
+          csvs.push(E.parseCSV(text));
+        } else if (f.kind === 'GPX') gpxs.push(E.parseGPX(await f.file.text()));
+        else if (f.kind === 'PDF') books.push(await pdfLines(await f.file.arrayBuffer()));
+        else if (f.kind === 'TXT') books.push((await f.file.text()).split(/\r?\n/));
+        f.status = 'ok';
+      } catch (err) { console.error(err); f.status = 'error'; toast(`Could not read ${f.name}`); }
+    }
+    renderChips();
+    if (csvs.length) st.csv = { rows: csvs.flatMap(c => c.rows), warnings: csvs.flatMap(c => c.warnings) };
+    if (gpxs.length) st.gpx = { wpts: gpxs.flatMap(g => g.wpts) };
+    const known = new Set([...(st.csv ? st.csv.rows.map(r => r.code) : [])]);
+    if (st.gpx) st.gpx.wpts.forEach(w => { const c = (w.name || '').trim().split(/[\s\-_:,]+/)[0]; if (/^[A-Z0-9]{3,8}$/.test(c) && /[A-Z]/.test(c)) known.add(c); });
+    if (books.length) st.book = E.parseBook(books.flat(), known);
+    if (!st.files.length) { st.data = null; renderAll(); return; }
+    st.data = E.merge({ book: st.book, csv: st.csv, gpx: st.gpx });
+    if (st.csv) st.csv.warnings.forEach(w => st.data.issues.push({ level: 'warn', text: w }));
+    if (st.book && st.book.rally.start != null) {
+      S.start = toHHMM(st.book.rally.start); S.end = toHHMM(st.book.rally.end);
+      $('#start').value = S.start; $('#end').value = S.end; store.set('settings', S);
+      toast(`Rally hours read from the book: ${E.fmtTime(st.book.rally.start)} to ${E.fmtTime(st.book.rally.end)}`);
+    }
+    st.places = st.data.places.slice();
+    st.startIdx = st.data.start ? st.places.findIndex(p => p.name === st.data.start.name) : -1;
+    st.finishIdx = -1;
+    st.matrix = null; st.results = {};
+    tryCachedMatrix();
+    renderAll();
+  }
+
+  // ------------------------------------------------------------ start / finish
+  function startPoint() { return st.custom.start || st.places[st.startIdx] || null; }
+  function finishPoint() { return st.finishIdx === -2 ? st.custom.finish : st.finishIdx >= 0 ? st.places[st.finishIdx] : startPoint(); }
+  function renderEnds() {
+    const opts = st.places.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
+    $('#startPt').innerHTML = (st.custom.start ? `<option value="-2">Map point (${st.custom.start.lat.toFixed(4)}, ${st.custom.start.lon.toFixed(4)})</option>` : '') + opts + (!st.places.length && !st.custom.start ? '<option value="-1">Set the start on the map</option>' : '');
+    $('#startPt').value = st.custom.start ? -2 : st.startIdx;
+    $('#finishPt').innerHTML = '<option value="-1">Same as start</option>' + (st.custom.finish ? `<option value="-2">Map point (${st.custom.finish.lat.toFixed(4)}, ${st.custom.finish.lon.toFixed(4)})</option>` : '') + opts;
+    $('#finishPt').value = st.finishIdx;
+    layers.ends.clearLayers();
+    const s = startPoint(), f = finishPoint();
+    if (s) L.marker([s.lat, s.lon], { icon: L.divIcon({ className: '', html: '<div class="pin hq">★</div>', iconSize: [30, 30], iconAnchor: [15, 15] }), zIndexOffset: 1000 }).bindTooltip(`Start: ${esc(s.name)}`).addTo(layers.ends);
+    if (f && s && (f.lat !== s.lat || f.lon !== s.lon)) L.marker([f.lat, f.lon], { icon: L.divIcon({ className: '', html: '<div class="pin hq">⚑</div>', iconSize: [30, 30], iconAnchor: [15, 15] }), zIndexOffset: 1000 }).bindTooltip(`Finish: ${esc(f.name)}`).addTo(layers.ends);
+  }
+  $('#startPt').onchange = e => { const v = +e.target.value; if (v !== -2) { st.custom.start = null; st.startIdx = v; } st.matrix = null; tryCachedMatrix(); refreshPace(); renderEnds(); updateGo(); };
+  $('#finishPt').onchange = e => { const v = +e.target.value; if (v !== -2) st.custom.finish = null; st.finishIdx = v; st.matrix = null; tryCachedMatrix(); refreshPace(); renderEnds(); };
+  document.querySelectorAll('[data-pick]').forEach(b => b.onclick = e => { e.preventDefault(); st.pick = b.dataset.pick; $('#maptip').classList.add('on'); map.getContainer().style.cursor = 'crosshair'; });
+  function endPick() { st.pick = null; $('#maptip').classList.remove('on'); map.getContainer().style.cursor = ''; }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') endPick(); });
+  map.on('click', e => {
+    if (!st.pick) return;
+    const pt = { name: `Map point`, lat: e.latlng.lat, lon: e.latlng.lng };
+    if (st.pick === 'start') st.custom.start = pt; else { st.custom.finish = pt; st.finishIdx = -2; }
+    endPick(); st.matrix = null; tryCachedMatrix(); refreshPace(); renderEnds(); updateGo();
+  });
+
+  // ------------------------------------------------------------ rendering
+  function binOf(p) { let k = 0; while (k < st.bins.length && p > st.bins[k]) k++; return k; }
+  function renderAll() {
+    const d = st.data;
+    $('#welcome').style.display = d ? 'none' : '';
+    $('#bonusCard').hidden = !d; $('#issueCard').hidden = !d; $('#legend').hidden = !d;
+    if (!d) { $('#stats').hidden = true; layers.bonus.clearLayers(); layers.route.clearLayers(); layers.pins.clearLayers(); layers.ends.clearLayers(); $('#resCard').hidden = true; updateGo(); return; }
+    const pts = d.bonuses.map(b => b.points).sort((a, b) => a - b);
+    const q = f => pts[Math.min(pts.length - 1, Math.floor(f * pts.length))] || 0;
+    st.bins = [q(0.2), q(0.4), q(0.6), q(0.8)];
+    const routable = d.bonuses.filter(b => b.rlat != null);
+    const hrs = st.book && st.book.rally.start != null ? `${E.fmtTime(st.book.rally.start).replace(':00 ', '')}–${E.fmtTime(st.book.rally.end).replace(':00 ', '')}` : '—';
+    $('#stats').hidden = false;
+    $('#stats').innerHTML = [
+      [routable.length, 'bonuses'], [d.combos.length, 'combos'], [fmtN(d.bonuses.reduce((a, b) => a + b.points, 0)), 'total pts'], [hrs, 'rally hours']
+    ].map(([v, k]) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
+    renderLegend(); renderMarkers(); renderEnds(); renderList(); renderIssues(); updateGo();
+    const ll = routable.map(b => [b.lat, b.lon]);
+    if (startPoint()) ll.push([startPoint().lat, startPoint().lon]);
+    if (ll.length && !Object.keys(st.results).length) map.fitBounds(ll, { padding: [40, 40] });
+  }
+  function renderLegend() {
+    const b = st.bins, labels = [`≤ ${b[0]}`, `${b[0] + 1}–${b[1]}`, `${b[1] + 1}–${b[2]}`, `${b[2] + 1}–${b[3]}`, `> ${b[3]}`];
+    $('#legend').innerHTML = '<b>Points</b>' + labels.map((l, i) => `<div class="row"><span class="sw" style="background:${PALETTE[i]}"></span>${l}</div>`).join('') +
+      `<div class="row"><span class="sw" style="background:transparent;border:2px solid var(--ink)"></span>has time window</div>`;
+  }
+  function popupHtml(b) {
+    const must = st.required.has(b.code), skip = st.excluded.has(b.code);
+    return `<div class="pop"><h4><code>${esc(b.code)}</code>${esc(b.name)}</h4>
+      <div class="m">${esc(b.city)}${b.city ? ' · ' : ''}<b>${b.points}</b> pts · ${esc(E.windowText(b.win))}</div>
+      ${b.proof ? `<div class="pr">${esc(b.proof)}</div>` : ''}
+      ${b.notes.map(n => `<div class="nt">${esc(n)}</div>`).join('')}
+      <div class="b"><button class="btn" data-act="must" data-code="${esc(b.code)}">${must ? '✓ Must visit' : 'Must visit'}</button><button class="btn" data-act="skip" data-code="${esc(b.code)}">${skip ? '✕ Skipped' : 'Skip'}</button></div></div>`;
+  }
+  function renderMarkers() {
+    layers.bonus.clearLayers(); markerOf.clear();
+    const inRoute = new Set((st.results[st.active] || {}).route || []);
+    for (const b of st.data.bonuses) {
+      if (b.lat == null) continue;
+      const k = binOf(b.points), skip = st.excluded.has(b.code);
+      const m = L.circleMarker([b.lat, b.lon], {
+        radius: 4 + k * 1.6, color: b.win.type === 'open' ? 'rgba(0,0,0,.35)' : (isDark() ? '#fff' : '#1c1915'),
+        weight: b.win.type === 'open' ? 1 : 2.2, fillColor: PALETTE[k], fillOpacity: skip ? 0.15 : inRoute.size && !inRoute.has(b.code) ? 0.45 : 0.95, opacity: skip ? 0.3 : 1
+      }).bindTooltip(esc(`${b.code} · ${b.points}${b.win.type !== 'open' ? ' · ' + E.windowText(b.win) : ''}`), { direction: 'top', offset: [0, -4] })
+        .bindPopup(() => popupHtml(b), { maxWidth: 300 });
+      m.addTo(layers.bonus); markerOf.set(b.code, m);
+    }
+  }
+  map.on('popupopen', e => {
+    e.popup.getElement().querySelectorAll('[data-act]').forEach(btn => btn.onclick = () => {
+      toggle(btn.dataset.code, btn.dataset.act); e.popup.setContent(popupHtml(st.data.bonuses.find(b => b.code === btn.dataset.code)));
+      map.fire('popupopen', { popup: e.popup });
+    });
+  });
+  function toggle(code, act) {
+    const a = act === 'must' ? st.required : st.excluded, o = act === 'must' ? st.excluded : st.required;
+    if (a.has(code)) a.delete(code); else { a.add(code); o.delete(code); }
+    store.set('required', [...st.required]); store.set('excluded', [...st.excluded]);
+    renderList(); renderMarkers();
+  }
+  function renderList() {
+    const q = ($('#q').value || '').trim().toLowerCase();
+    const inRoute = new Set((st.results[st.active] || {}).route || []);
+    const rows = st.data.bonuses.filter(b => !q || (b.code + ' ' + b.name + ' ' + b.city).toLowerCase().includes(q)).sort((a, b) => b.points - a.points);
+    $('#bonusCount').textContent = `${rows.length} shown`;
+    $('#blist').innerHTML = rows.map(b => `<div class="brow${inRoute.has(b.code) ? ' inr' : ''}" data-code="${esc(b.code)}">
+      <span class="sw" style="background:${PALETTE[binOf(b.points)]}"></span><code>${esc(b.code)}</code>
+      <span class="nm" title="${esc(b.name)}">${esc(b.name)}${b.win.type !== 'open' ? ` <span class="tag win">${esc(E.windowText(b.win))}</span>` : ''}</span>
+      <span class="pt">${b.points}</span>
+      <span class="tg"><button class="must${st.required.has(b.code) ? ' on' : ''}" data-act="must" title="Must visit">MUST</button><button class="skip${st.excluded.has(b.code) ? ' on' : ''}" data-act="skip" title="Never visit">SKIP</button></span></div>`).join('') || '<div class="empty">No matches</div>';
+    $('#blist').querySelectorAll('.brow').forEach(r => r.onclick = e => {
+      const act = e.target.dataset.act;
+      if (act) { toggle(r.dataset.code, act); return; }
+      const m = markerOf.get(r.dataset.code); if (m) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 11)); m.openPopup(); }
+    });
+  }
+  $('#q').addEventListener('input', () => renderList());
+  function renderIssues() {
+    const list = [...st.data.issues, ...((st.results[st.active] || {}).notes || []).map(t => ({ level: 'warn', text: t }))];
+    list.push({ level: 'info', text: 'Bonus windows are read as local time at the bonus. Photos are planned at least the "window margin" before a window closes.' });
+    list.push({ level: 'info', text: '"Finish" means arriving at the finish point. The plan targets the deadline minus your safety buffer.' });
+    if (st.book && st.book.rally.penaltyText) list.push({ level: 'info', text: 'From the book: ' + st.book.rally.penaltyText.slice(0, 400) });
+    $('#issues').innerHTML = list.map(i => `<li><span class="ic ${i.level}"></span><span>${esc(i.text)}</span></li>`).join('');
+  }
+  function updateGo() {
+    const ok = st.data && startPoint() && !st.running;
+    $('#go').disabled = !ok;
+    $('#goLbl').textContent = st.running ? 'Searching…' : !st.data ? 'Load rally files to begin' : !startPoint() ? 'Set a start point' : Object.keys(st.results).length ? 'Search again' : 'Find best route';
+  }
+
+  // ------------------------------------------------------------ routing matrix
+  const OSRM = 'https://router.project-osrm.org';
+  function matrixPoints() {
+    const s = startPoint(), f = finishPoint();
+    return [s, f, ...st.data.bonuses.filter(b => b.rlat != null).map(b => ({ lat: b.rlat, lon: b.rlon }))];
+  }
+  function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+  async function fetchJSON(url, tries = 5) {
+    for (let a = 0; a < tries; a++) {
+      try { const r = await fetch(url); if (r.ok) { const j = await r.json(); if (j.code === 'Ok') return j; } } catch { /* retry */ }
+      await new Promise(r => setTimeout(r, 1100 * (a + 1)));
+    }
+    throw new Error('Routing service did not respond');
+  }
+  async function getMatrix(onProg) {
+    const pts = matrixPoints();
+    const key = hash(pts.map(p => p.lat.toFixed(5) + ',' + p.lon.toFixed(5)).join(';'));
+    const cached = store.get('matrix', null);
+    if (cached && cached.key === key) return cached;
+    const n = pts.length, B = 40, sec = new Array(n * n).fill(null), m = new Array(n * n).fill(null);
+    const blocks = []; for (let i = 0; i < n; i += B) for (let j = 0; j < n; j += B) blocks.push([i, j]);
+    let done = 0;
+    for (const [i0, j0] of blocks) {
+      const I = [], J = []; for (let i = i0; i < Math.min(n, i0 + B); i++) I.push(i); for (let j = j0; j < Math.min(n, j0 + B); j++) J.push(j);
+      const idx = [...new Set([...I, ...J])].sort((a, b) => a - b), pos = new Map(idx.map((k, p) => [k, p]));
+      const coords = idx.map(k => `${pts[k].lon.toFixed(6)},${pts[k].lat.toFixed(6)}`).join(';');
+      const j = await fetchJSON(`${OSRM}/table/v1/driving/${coords}?sources=${I.map(k => pos.get(k)).join(';')}&destinations=${J.map(k => pos.get(k)).join(';')}&annotations=duration,distance`);
+      I.forEach((a, ai) => J.forEach((b, bi) => { sec[a * n + b] = j.durations[ai][bi]; m[a * n + b] = j.distances[ai][bi]; }));
+      onProg(++done / blocks.length);
+      await new Promise(r => setTimeout(r, 1100)); // the public OSRM server allows 1 request per second
+    }
+    const out = { key, n, sec: sec.map(v => v == null ? null : Math.round(v)), m: m.map(v => v == null ? null : Math.round(v)) };
+    store.set('matrix', out);
+    return out;
+  }
+
+  // ------------------------------------------------------------ optimisation (parallel workers)
+  let workerURL = null;
+  function makeWorker() {
+    if (!workerURL) {
+      const src = $('#engine-src').textContent + `
+        self.onmessage = e => {
+          const { data, matrix, settings, opts } = e.data;
+          const M = RallyEngine.buildModel(data, matrix, settings);
+          let last = 0;
+          const res = RallyEngine.optimize(M, { ...opts, onProgress: (f, r) => { const now = Date.now(); if (now - last > 250) { last = now; postMessage({ type: 'progress', f, points: RallyEngine.score(M, r).points }); } } });
+          postMessage({ type: 'done', route: res.route.map(u => M.bon[u - 1].code), notes: res.notes });
+        };`;
+      workerURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    }
+    return new Worker(workerURL);
+  }
+  function modelSettings(extra) {
+    return {
+      calib: +S.calib, pace: pacePct(), stopMin: +S.stopMin, autoExtra: String(S.autoExtra) === 'true', extraStop: {},
+      excluded: [...st.excluded], required: [...st.required], start: toMin(S.start), end: toMin(S.end), buffer: +S.buffer,
+      range: +S.range, reserve: +S.reserve, fuelMin: +S.fuelMin, winMargin: +S.winMargin, sunrise: toMin(S.sunrise), sunset: toMin(S.sunset),
+      startLat: startPoint().lat, startLon: startPoint().lon, ...extra
+    };
+  }
+  async function solve(settings, opts, budget, onProg) {
+    const nW = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
+    const prog = new Array(nW).fill(0), best = new Array(nW).fill(0);
+    const payload = { data: st.data, matrix: st.matrix, settings };
+    let outs;
+    try {
+      outs = await Promise.all([...Array(nW)].map((_, i) => new Promise((res, rej) => {
+        const w = makeWorker();
+        w.onmessage = e => {
+          if (e.data.type === 'progress') { prog[i] = e.data.f; best[i] = e.data.points; onProg(Math.min(...prog), Math.max(...best)); }
+          else { w.terminate(); res(e.data); }
+        };
+        w.onerror = err => { w.terminate(); rej(err); };
+        w.postMessage({ ...payload, opts: { ...opts, budgetMs: budget, seed: 17 + i * 7919 } });
+      })));
+    } catch (err) {
+      console.warn('Workers unavailable, solving on the page', err);
+      const M = E.buildModel(st.data, st.matrix, settings);
+      const r = E.optimize(M, { ...opts, budgetMs: Math.min(budget, 8000) });
+      outs = [{ route: r.route.map(u => M.bon[u - 1].code), notes: r.notes }];
+    }
+    const M = E.buildModel(st.data, st.matrix, settings);
+    let bestD = null;
+    for (const o of outs) {
+      const d = E.describe(M, o.route.map(c => M.codeIdx.get(c)));
+      d.notes = o.notes; d.pace = settings.pace;
+      if (!bestD || d.points > bestD.points || (d.points === bestD.points && d.miles < bestD.miles)) bestD = d;
+    }
+    return bestD;
+  }
+
+  function setProg(f, txt, pts) {
+    $('#prog').classList.add('on');
+    $('#prog .bar i').style.width = Math.round(f * 100) + '%';
+    $('#progTxt').textContent = txt;
+    $('#progPts').textContent = pts ? `${fmtN(pts)} pts` : '';
+  }
+
+  $('#go').onclick = async () => {
+    if (st.running) return;
+    st.running = true; updateGo();
+    try {
+      if (!st.matrix) {
+        setProg(0, 'Measuring road distances…');
+        st.matrix = await getMatrix(f => setProg(f * 0.15, `Measuring road distances… ${Math.round(f * 100)}%`));
+        refreshPace();
+      }
+      const budget = BUDGET[S.depth] || 20000;
+      st.results = {};
+      const base = 0.15, span = 0.85;
+      // 1. maximum points
+      const max = await solve(modelSettings(), { lam: 0 }, budget, (f, p) => setProg(base + span * 0.6 * f, 'Finding the highest-scoring route…', p));
+      st.results.max = { ...max, label: 'Max points' }; st.active = 'max'; renderResults(); drawRoute();
+      // 2. more buffer
+      const safer = await solve(modelSettings({ buffer: +S.buffer + 30 }), { lam: 0 }, budget * 0.35, (f, p) => setProg(base + span * (0.6 + 0.2 * f), 'Finding a safer route (+30 min buffer)…', p));
+      st.results.safer = { ...safer, label: '+30 min buffer' }; renderResults();
+      // 3. efficient (points per mile)
+      const lam = max.miles > 0 ? 0.35 * max.points / max.miles : 0;
+      const eff = await solve(modelSettings(), { lam }, budget * 0.35, (f, p) => setProg(base + span * (0.8 + 0.2 * f), 'Finding the most efficient route…', p));
+      st.results.eff = { ...eff, label: 'Fewest miles' };
+      // the other scenarios meet the max-points constraints too, so keep whichever scored highest
+      const top = [eff, safer].filter(x => x.points > st.results.max.points).sort((a, b) => b.points - a.points)[0];
+      if (top) { st.results.max = { ...top, label: 'Max points' }; if (st.active === 'max') drawRoute(); }
+      renderResults();
+      setProg(1, 'Done', max.points);
+      setTimeout(() => $('#prog').classList.remove('on'), 1200);
+    } catch (err) {
+      console.error(err); toast(err.message || 'Something went wrong'); $('#prog').classList.remove('on');
+    } finally { st.running = false; updateGo(); }
+  };
+
+  // ------------------------------------------------------------ results
+  function renderResults() {
+    const r = st.results[st.active]; if (!r) return;
+    $('#resCard').hidden = false;
+    $('#tabs').innerHTML = ['max', 'safer', 'eff'].map(k => {
+      const x = st.results[k];
+      return `<button class="tab${k === st.active ? ' on' : ''}" data-k="${k}" ${x ? '' : 'disabled'}><div class="t">${x ? x.label : k === 'safer' ? '+30 min buffer' : 'Fewest miles'}</div><div class="p">${x ? fmtN(x.points) : '…'}</div></button>`;
+    }).join('');
+    $('#tabs').querySelectorAll('.tab').forEach(t => t.onclick = () => { if (!st.results[t.dataset.k]) return; st.active = t.dataset.k; renderResults(); drawRoute(); });
+    const spare = r.end - r.finish;
+    const gal = r.miles / (+S.mpg || 1), cost = gal * (+S.fuelPrice || 0);
+    const stopT = r.legs.reduce((a, l) => a + l.stop, 0) + r.fuels * (+S.fuelMin);
+    const comboNames = r.combos.map(c => (st.data.combos.find(x => x.code === c) || {}));
+    let html = `<div class="hero"><div><div class="big">${fmtN(r.points)}</div><div class="cap">estimated points · ${r.route.length} bonuses</div></div>
+      <div class="fin"><div class="v">${E.fmtTime(r.finish)}</div><div class="cap"><span class="pill ${spare >= +S.buffer - 0.5 ? 'ok' : 'warn'}">${Math.round(spare)} min before deadline</span>${r.pace > 100.5 ? '<br><span class="pill err" style="margin-top:4px">assumes speeding</span>' : ''}</div></div></div>
+      <div class="kpis">
+        <div class="kpi"><div class="v">${fmtN(r.miles)} mi</div><div class="k">${(r.points / Math.max(r.miles, 1)).toFixed(1)} pts / mile</div></div>
+        <div class="kpi"><div class="v">${fmtH(r.ride)}</div><div class="k">riding · avg ${(r.miles / Math.max(r.ride / 60, 0.01)).toFixed(0)} mph</div></div>
+        <div class="kpi"><div class="v">${fmtH(stopT + r.wait)}</div><div class="k">stops${r.wait > 0.5 ? ` + ${Math.round(r.wait)} min waiting` : ''}</div></div>
+        <div class="kpi"><div class="v">${r.fuels}</div><div class="k">fuel stop${r.fuels === 1 ? '' : 's'}</div></div>
+        <div class="kpi"><div class="v">${gal.toFixed(1)} gal</div><div class="k">at ${S.mpg} mpg</div></div>
+        <div class="kpi"><div class="v">$${cost.toFixed(0)}</div><div class="k">fuel cost</div></div>
+      </div>`;
+    if (comboNames.length) html += `<div class="combos">${comboNames.map(c => `<span class="combo">✓ ${esc(c.code)} ${esc(c.name || '')} +${fmtN(c.points || 0)}</span>`).join('')}</div>`;
+    html += `<div class="actions"><button class="btn" id="gpxBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>GPX for GPS</button><button class="btn" id="csvBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Itinerary CSV</button><button class="btn" id="printBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/></svg>Print</button></div>`;
+    // timeline
+    const s = startPoint(), f = finishPoint();
+    html += `<div class="tl"><div class="stop hq"><div class="dot">★</div><div><div class="nm">Start · ${esc(s.name)}</div><div class="meta">Full tank</div></div><div class="r"><div class="tm">${E.fmtTime(toMin(S.start))}</div></div></div>`;
+    r.legs.forEach((l, k) => {
+      const b = l.code === 'FINISH' ? null : st.data.bonuses.find(x => x.code === l.code);
+      html += `<div class="leg"><div class="rail"><i></i></div><span>${l.fuel ? '<span class="fuel">⛽ fuel first · </span>' : ''}${l.mi.toFixed(1)} mi · ${Math.round(l.ride)} min</span></div>`;
+      if (!b) {
+        html += `<div class="stop hq"><div class="dot">⚑</div><div><div class="nm">Finish · ${esc(f.name)}</div><div class="meta">Deadline ${E.fmtTime(r.end)} · target ${E.fmtTime(r.deadline)}</div></div><div class="r"><div class="tm">${E.fmtTime(l.arr)}</div><div class="pt">${fmtN(r.points)}</div></div></div>`;
+        return;
+      }
+      const win = b.win.type !== 'open' ? `<span class="tag win">${esc(E.windowText(b.win))}</span>` : '';
+      const wait = l.wait > 0.5 ? `<span class="tag wait">wait ${Math.round(l.wait)} min</span>` : '';
+      const bike = b.bike ? '<span class="tag bike">bike in photo</span>' : '';
+      html += `<div class="stop" data-code="${esc(b.code)}"><div class="dot">${k + 1}</div><div><div class="nm"><code>${esc(b.code)}</code>${esc(b.name)}</div>
+        <div class="meta">${esc(b.city)}${b.city ? ' · ' : ''}${Math.round(l.stop)} min stop${win}${wait}${bike}</div>
+        ${b.proof ? `<div class="proof">${esc(b.proof)}</div>` : ''}${b.notes.length ? `<div class="proof" style="color:var(--warn)">${esc(b.notes.join(' '))}</div>` : ''}</div>
+        <div class="r"><div class="tm">${E.fmtTime(l.photo)}</div><div class="pt">+${b.points}</div></div></div>`;
+    });
+    html += '</div>';
+    $('#resBody').innerHTML = html;
+    $('#resBody').querySelectorAll('.stop[data-code]').forEach(el => el.onclick = () => {
+      const m = markerOf.get(el.dataset.code); if (m) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 12)); m.openPopup(); }
+    });
+    $('#gpxBtn').onclick = exportGPX; $('#csvBtn').onclick = exportCSV; $('#printBtn').onclick = () => window.print();
+    renderList(); renderMarkers(); renderIssues();
+  }
+
+  const geomCache = new Map();
+  async function drawRoute() {
+    layers.route.clearLayers(); layers.pins.clearLayers();
+    const r = st.results[st.active]; if (!r) return;
+    const s = startPoint(), f = finishPoint();
+    const stops = r.route.map(c => st.data.bonuses.find(b => b.code === c));
+    const pts = [s, ...stops.map(b => ({ lat: b.rlat, lon: b.rlon })), f];
+    stops.forEach((b, k) => L.marker([b.lat, b.lon], { icon: L.divIcon({ className: '', html: `<div class="pin">${k + 1}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }), zIndexOffset: 500 })
+      .bindTooltip(esc(`${k + 1}. ${b.code} · ${b.points}`), { direction: 'top', offset: [0, -10] }).on('click', () => { const m = markerOf.get(b.code); if (m) m.openPopup(); }).addTo(layers.pins));
+    const key = pts.map(p => p.lat.toFixed(5) + ',' + p.lon.toFixed(5)).join(';');
+    let line = geomCache.get(key), dashed = false;
+    if (!line) {
+      try {
+        const j = await fetchJSON(`${OSRM}/route/v1/driving/${pts.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)}`).join(';')}?overview=full&geometries=geojson`, 3);
+        line = j.routes[0].geometry.coordinates.map(([lo, la]) => [la, lo]); geomCache.set(key, line);
+      } catch { line = pts.map(p => [p.lat, p.lon]); dashed = true; }
+    }
+    if (st.results[st.active] !== r) return; // a different tab was picked meanwhile
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    L.polyline(line, { color: isDark() ? '#000' : '#fff', weight: 8, opacity: 0.85 }).addTo(layers.route);
+    L.polyline(line, { color: accent, weight: 4.5, opacity: 1, dashArray: dashed ? '6 8' : null }).addTo(layers.route);
+    map.fitBounds(L.latLngBounds(line), { padding: [40, 40] });
+  }
+
+  // ------------------------------------------------------------ exports
+  function download(name, text, type) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  const xml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  function exportGPX() {
+    const r = st.results[st.active], s = startPoint(), f = finishPoint();
+    const stops = r.route.map(c => st.data.bonuses.find(b => b.code === c));
+    const pt = (tag, lat, lon, name, desc) => `  <${tag} lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}"><name>${xml(name)}</name>${desc ? `<desc>${xml(desc)}</desc>` : ''}</${tag}>`;
+    const gpx = ['<?xml version="1.0" encoding="UTF-8"?>', '<gpx version="1.1" creator="Rally Route Planner" xmlns="http://www.topografix.com/GPX/1/1">',
+      ...stops.map((b, k) => pt('wpt', b.lat, b.lon, b.code, `${k + 1}. ${b.name} (${b.points} pts) ${b.proof}`)),
+      `  <rte><name>Rally route ${fmtN(r.points)} pts</name>`,
+      pt('rtept', s.lat, s.lon, 'START'), ...stops.map(b => pt('rtept', b.rlat, b.rlon, b.code)), pt('rtept', f.lat, f.lon, 'FINISH'),
+      '  </rte>', '</gpx>'].join('\n');
+    download(`rally-route-${r.points}.gpx`, gpx, 'application/gpx+xml');
+  }
+  function exportCSV() {
+    const r = st.results[st.active];
+    // text starting with = + - @ would run as a formula in Excel, so it gets a leading apostrophe
+    const q = v => { let s = String(v ?? ''); if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s; return `"${s.replace(/"/g, '""')}"`; };
+    const rows = [['#', 'Code', 'Name', 'Town', 'Leg miles', 'Ride min', 'Fuel before leg', 'Arrive', 'Photo', 'Window', 'Points', 'Running', 'Proof'].map(q).join(',')];
+    r.legs.forEach((l, k) => {
+      const b = st.data.bonuses.find(x => x.code === l.code);
+      rows.push([k + 1, l.code, b ? b.name : 'Finish', b ? b.city : '', l.mi.toFixed(1), Math.round(l.ride), l.fuel ? 'Y' : 'N', E.fmtTime(l.arr), b ? E.fmtTime(l.photo) : '', b ? E.windowText(b.win) : '', l.points, l.running, b ? b.proof : ''].map(q).join(','));
+    });
+    download(`rally-itinerary-${r.points}.csv`, rows.join('\n'), 'text/csv');
+  }
+
+  bindForm(); renderAll(); initPdf();
+})();
+
+</script>
+</body>
+</html>
